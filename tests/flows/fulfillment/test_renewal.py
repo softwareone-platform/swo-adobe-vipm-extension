@@ -145,6 +145,8 @@ def test_setup_renewal_plan_step(
             "renewal_quantity": 15,
             "flex_discount_codes": ["CODE-1"],
             "clear_flex_discount_codes": False,
+            "deployment_id": "",
+            "currency_code": "USD",
             "snapshot": {
                 "enabled": True,
                 "renewal_quantity": 10,
@@ -159,6 +161,8 @@ def test_setup_renewal_plan_step(
             "renewal_quantity": 0,
             "flex_discount_codes": [],
             "clear_flex_discount_codes": False,
+            "deployment_id": "",
+            "currency_code": "USD",
             "snapshot": {
                 "enabled": True,
                 "renewal_quantity": 10,

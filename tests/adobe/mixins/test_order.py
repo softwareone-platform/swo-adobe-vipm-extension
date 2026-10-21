@@ -806,3 +806,37 @@ def test_create_preview_renewal_order_cascades_to_next_candidate(
     assert result == accepted_response
     assert cascade.selection == {1: "BONUS_5"}
     assert cascade.rejections == {1: ["BONUS_10"]}
+
+
+def test_create_preview_renewal_order_adds_currency_to_deployment_line(
+    adobe_client_factory, requests_mocker, settings
+):
+    """A deployment line with no currencyCode gets the authorization currency, not the order."""
+    client, authorization, _ = adobe_client_factory()
+    line = {**RENEWAL_LINE, "deploymentId": "a_deployment_id"}
+    response_json = {"externalReferenceId": "ORD-1_RENEWAL", "lineItems": [line]}
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/customers/a-customer/orders",
+        ),
+        json=response_json,
+        match=[
+            matchers.json_params_matcher({
+                "externalReferenceId": "ORD-1_RENEWAL",
+                "orderType": ORDER_TYPE_PREVIEW_RENEWAL,
+                "lineItems": [{**line, "currencyCode": authorization.currency}],
+            }),
+            matchers.query_param_matcher({"fetch-price": "true"}),
+        ],
+    )
+
+    result = client.create_preview_renewal_order(
+        authorization.authorization_uk,
+        "a-customer",
+        "ORD-1_RENEWAL",
+        [line],
+        FlexDiscountCascade(candidates={}),
+    )  # act
+
+    assert result == response_json
