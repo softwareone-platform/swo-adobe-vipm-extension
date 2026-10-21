@@ -1095,6 +1095,39 @@ class SubmitReturnOrders(Step):
             raise
 
 
+def get_owned_partial_skus(context) -> set[str] | None:
+    """
+    Return the partial SKUs of the customer's active Adobe subscriptions.
+
+    They gate the codes that require a qualifying offer (see
+    matches_qualifying_skus). A customer not created in Adobe yet owns
+    nothing. When the subscriptions cannot be read the ownership is unknown
+    (None) and the gate keeps every code: Adobe's preview stays the authority.
+
+    Args:
+        context: Order processing context (authorization, Adobe customer id).
+
+    Returns:
+        set[str] | None: The owned partial SKUs, None when they could not be read.
+    """
+    if not context.adobe_customer_id:
+        return set()
+    try:
+        subscriptions = get_adobe_client().get_subscriptions(
+            context.authorization_id, context.adobe_customer_id
+        )
+    except AdobeAPIError:
+        logger.warning(
+            "%s: owned subscriptions unavailable, qualifying offers not checked", context
+        )
+        return None
+    return {
+        get_partial_sku(subscription["offerId"])
+        for subscription in subscriptions["items"]
+        if subscription["status"] == AdobeSubscriptionStatus.ACTIVE
+    }
+
+
 class SelectFlexDiscounts(Step):
     """
     Select the flexible discount candidates of the new/upsize lines from the store.
@@ -1115,8 +1148,11 @@ class SelectFlexDiscounts(Step):
         next_step(client, context)
 
     def _select_candidates(self, context):
+        owned_partial_skus = get_owned_partial_skus(context)
         try:
-            candidates_by_line = select_flex_discounts(context)
+            candidates_by_line = select_flex_discounts(
+                context, owned_partial_skus=owned_partial_skus
+            )
         except Exception:
             logger.exception("%s: failed to select the flex discount candidates", context)
             send_exception(
@@ -2222,8 +2258,11 @@ class PreviewRenewalOrders(Step):
         for info in context.manual_renewal_lines.values():
             info.pop("flex_discount_code", None)
             info.pop("renewal_unit_price", None)
+        owned_partial_skus = get_owned_partial_skus(context)
         try:
-            candidates_by_sku = select_renewal_flex_discounts(context)
+            candidates_by_sku = select_renewal_flex_discounts(
+                context, owned_partial_skus=owned_partial_skus
+            )
         except Exception:
             logger.exception(
                 "%s: failed to select the late-renewal flex discount candidates", context

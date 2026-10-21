@@ -63,6 +63,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     build_committed_renewal_line_items,
     build_renewal_line_items,
     check_processing_template,
+    get_owned_partial_skus,
     is_renewal_unsupported_error,
     send_gc_mpt_notification,
     set_customer_coterm_date_if_null,
@@ -4274,6 +4275,47 @@ def test_submit_renewal_orders_existing_order_reused(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+def test_get_owned_partial_skus(mock_adobe_client, adobe_subscription_factory):
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription_factory(offer_id="65304521CA01A12"),
+            adobe_subscription_factory(
+                offer_id="65322651CA01A12", status=AdobeSubscriptionStatus.INACTIVE.value
+            ),
+        ]
+    }
+    context = Context(
+        order={}, authorization_id="authorization-id", adobe_customer_id="customer-id"
+    )
+
+    result = get_owned_partial_skus(context)  # act
+
+    assert result == {"65304521CA"}
+    mock_adobe_client.get_subscriptions.assert_called_once_with("authorization-id", "customer-id")
+
+
+def test_get_owned_partial_skus_new_customer(mock_adobe_client):
+    context = Context(order={}, adobe_customer_id=None)
+
+    result = get_owned_partial_skus(context)  # act
+
+    assert result == set()
+    mock_adobe_client.get_subscriptions.assert_not_called()
+
+
+def test_get_owned_partial_skus_adobe_error(mock_adobe_client):
+    mock_adobe_client.get_subscriptions.side_effect = AdobeAPIError(
+        400, {"code": "9999", "message": "unavailable"}
+    )
+    context = Context(
+        order={}, authorization_id="authorization-id", adobe_customer_id="customer-id"
+    )
+
+    result = get_owned_partial_skus(context)  # act
+
+    assert result is None
+
+
 def test_select_flex_discounts_step(mocker, order_factory, mock_mpt_client):
     order = order_factory()
     context = Context(
@@ -4283,6 +4325,10 @@ def test_select_flex_discounts_step(mocker, order_factory, mock_mpt_client):
         new_lines=order["lines"],
     )
     candidates = {order["lines"][0]["id"]: [mocker.MagicMock(code="CODE-1")]}
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_owned_partial_skus",
+        return_value={"65304521CA"},
+    )
     mocked_select = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.select_flex_discounts",
         return_value=candidates,
@@ -4293,7 +4339,7 @@ def test_select_flex_discounts_step(mocker, order_factory, mock_mpt_client):
     step(mock_mpt_client, context, mocked_next_step)  # act
 
     assert context.flex_discount_candidates == candidates
-    mocked_select.assert_called_once_with(context)
+    mocked_select.assert_called_once_with(context, owned_partial_skus={"65304521CA"})
     mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
@@ -4343,6 +4389,7 @@ def test_select_flex_discounts_step_store_error(mocker, order_factory, mock_mpt_
         adobe_customer_id="customer-id",
         new_lines=order["lines"],
     )
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.get_owned_partial_skus", return_value=set())
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.select_flex_discounts",
         side_effect=RuntimeError("airtable down"),
@@ -4654,6 +4701,10 @@ def test_preview_renewal_orders_proposes_renewal_codes(
     mock_adobe_client.get_orders.return_value = []
     context = _renewal_context(order)
     context.preview_late_renewal_order = _renewal_preview()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_owned_partial_skus",
+        return_value={"65304521CA"},
+    )
     mocked_select = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.select_renewal_flex_discounts",
         return_value={
@@ -4670,7 +4721,7 @@ def test_preview_renewal_orders_proposes_renewal_codes(
         mocked_client, context, mocked_next_step
     )  # act
 
-    mocked_select.assert_called_once_with(context)
+    mocked_select.assert_called_once_with(context, owned_partial_skus={"65304521CA"})
     mock_adobe_client.create_preview_renewal_order.assert_called_once_with(
         "authorization-id",
         "customer-id",

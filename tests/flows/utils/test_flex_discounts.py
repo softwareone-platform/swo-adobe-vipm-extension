@@ -434,6 +434,39 @@ def test_get_flex_discount_candidates(mocker):
     mocked_redemptions.assert_called_once_with("P100", ["NEW_ONLY", "ANY", "OTHER_SKU"])
 
 
+def test_get_flex_discount_candidates_filters_qualifying_offers(mocker):
+    codes = [
+        make_code(code="QUALIFIED", qualifying_offer_ids="65304521CA"),
+        make_code(code="NOT_OWNED", qualifying_offer_ids="65322651CA"),
+        make_code(code="NO_PREREQUISITE"),
+    ]
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_visible_discount_codes",
+        return_value=codes,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_discount_values",
+        return_value=[make_value(code.code, value=5) for code in codes],
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_customer_discount_redemptions",
+        return_value=[],
+    )
+    new_line = {"id": "ALI-1", "item": {"externalIds": {"vendor": "65304578CA"}}}
+
+    result = get_flex_discount_candidates(
+        market_segment="COM",
+        customer_id="P100",
+        country="US",
+        commitment=CommitmentType.ANNUAL,
+        new_lines=[new_line],
+        upsize_lines=[],
+        owned_partial_skus={"65304521CA"},
+    )  # act
+
+    assert [c.code for c in result["ALI-1"]] == ["QUALIFIED", "NO_PREREQUISITE"]
+
+
 def test_get_flex_discount_candidates_without_lines(mocker):
     mocked_codes = mocker.patch("adobe_vipm.flows.utils.flex_discounts.get_visible_discount_codes")
 
@@ -485,6 +518,36 @@ def test_get_renewal_flex_discount_candidates(mocker):
         "65304578CA": ["BONUS_10"],
     }
     mocked_codes.assert_called_once_with("COM", "P100")
+
+
+def test_get_renewal_flex_discount_candidates_filters_qualifying_offers(mocker):
+    codes = [
+        make_code(code="QUALIFIED", applicable_order_types=["RENEWAL"], qualifying_offer_ids="A"),
+        make_code(code="NOT_OWNED", applicable_order_types=["RENEWAL"], qualifying_offer_ids="B"),
+    ]
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_visible_discount_codes",
+        return_value=codes,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_discount_values",
+        return_value=[make_value("QUALIFIED", value=10), make_value("NOT_OWNED", value=10)],
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_customer_discount_redemptions",
+        return_value=[],
+    )
+
+    result = get_renewal_flex_discount_candidates(
+        market_segment="COM",
+        customer_id="P100",
+        country="US",
+        commitment=CommitmentType.ANNUAL,
+        renewal_lines={"65304578CA": {"offer_id": "65304578CA01A12"}},
+        owned_partial_skus={"A"},
+    )  # act
+
+    assert [c.code for c in result["65304578CA"]] == ["QUALIFIED"]
 
 
 def test_get_renewal_flex_discount_candidates_without_lines(mocker):
@@ -653,7 +716,7 @@ def test_select_flex_discounts(mocker, order_factory, lines_factory, adobe_custo
         return_value={"65304578CA01A12": 200.0},
     )
 
-    result = select_flex_discounts(context)  # act
+    result = select_flex_discounts(context, owned_partial_skus={"65304521CA"})  # act
 
     assert [(c.code, c.net_unit_price) for c in result[line_id]] == [
         ("PCT_20", 160.0),
@@ -666,6 +729,7 @@ def test_select_flex_discounts(mocker, order_factory, lines_factory, adobe_custo
         commitment=mocker.ANY,
         new_lines=order["lines"],
         upsize_lines=[],
+        owned_partial_skus={"65304521CA"},
     )
     mocked_get_sku_price.assert_called_once_with(
         context.adobe_customer, ["65304578CA01A12"], "PRD-1111-1111", "USD"
@@ -871,7 +935,7 @@ def test_select_renewal_flex_discounts(mocker, order_factory, adobe_customer_fac
         return_value={"65304578CA01A12": 200.0},
     )
 
-    result = select_renewal_flex_discounts(context)  # act
+    result = select_renewal_flex_discounts(context, owned_partial_skus={"65304521CA"})  # act
 
     assert [(c.code, c.net_unit_price) for c in result["65304578CA"]] == [
         ("PCT_20", 160.0),
@@ -883,6 +947,7 @@ def test_select_renewal_flex_discounts(mocker, order_factory, adobe_customer_fac
         country=mocker.ANY,
         commitment=mocker.ANY,
         renewal_lines=manual_renewal_lines,
+        owned_partial_skus={"65304521CA"},
     )
     mocked_get_sku_price.assert_called_once_with(
         context.adobe_customer, ["65304578CA01A12"], "PRD-1111-1111", "USD"
