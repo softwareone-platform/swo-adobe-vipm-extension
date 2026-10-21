@@ -347,13 +347,32 @@ def test_get_preview_order_ignores_unrequested_rejections(
     assert cascade.rejections == {}
 
 
-def test_get_preview_order_not_qualified(
+@pytest.mark.parametrize(
+    ("error_code", "message", "reason"),
+    [
+        (
+            AdobeErrorCode.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT,
+            "Customer is not qualified for the Flexible Discount",
+            "Invalid Flexible Discount",
+        ),
+        (AdobeErrorCode.INVALID_FLEX_DISCOUNT_CODE, "Invalid Flexible Discount Code", "NOT_FOUND"),
+        (
+            AdobeErrorCode.FLEX_DISCOUNT_CODE_LIMIT_EXCEEDED,
+            "Flexible Discount Code limit exceeded",
+            "LIMIT_EXCEEDED",
+        ),
+    ],
+)
+def test_get_preview_order_code_refused(
     adobe_client_factory,
     requests_mocker,
     settings,
     order_preview_discounts_resp_factory,
     preview_discounts_payload_factory,
     caplog,
+    error_code,
+    message,
+    reason,
 ):
     mocked_client, authorization, _ = adobe_client_factory()
     payload = preview_discounts_payload_factory()
@@ -366,11 +385,11 @@ def test_get_preview_order_not_qualified(
             payload,
             {
                 "body": AdobeAPIError(
-                    status_code=int(AdobeErrorCode.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT),
+                    status_code=400,
                     payload={
-                        "code": "2141",
-                        "message": "Customer is not qualified for the Flexible Discount",
-                        "additionalDetails": ["Line Item: 3, Reason: Invalid Flexible Discount"],
+                        "code": str(error_code),
+                        "message": message,
+                        "additionalDetails": [f"Line Item: 3, Reason: {reason}"],
                     },
                 )
             },
@@ -391,16 +410,16 @@ def test_get_preview_order_not_qualified(
             ],
             **response,
         )
+    cascade = FlexDiscountCascade(candidates={3: ["BLACK_FRIDAY"]})
 
-    mocked_client.get_preview_order(authorization, "test-customer", payload)  # act
+    result = mocked_client.get_preview_order(authorization, "test-customer", payload, cascade)
 
-    assert (
-        "2141 - Customer is not qualified for the Flexible Discount: Line Item: 3, Reason: Invalid "
-        "Flexible Discount" in caplog.messages
-    )
+    assert result == discounts_resp_ok
+    assert cascade.rejections == {3: ["BLACK_FRIDAY"]}
+    assert f"{error_code} - {message}: Line Item: 3, Reason: {reason}" in caplog.messages
 
 
-def test_get_preview_order_not_qualified_on_undiscounted_line(
+def test_get_preview_order_code_refused_on_undiscounted_line(
     adobe_client_factory,
     requests_mocker,
     settings,
@@ -415,11 +434,11 @@ def test_get_preview_order_not_qualified_on_undiscounted_line(
         ),
         match=[matchers.json_params_matcher(payload)],
         body=AdobeAPIError(
-            status_code=int(AdobeErrorCode.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT),
+            status_code=400,
             payload={
-                "code": "2141",
-                "message": "Customer is not qualified for the Flexible Discount",
-                "additionalDetails": ["Line Item: 4, Reason: Invalid Flexible Discount"],
+                "code": "2146",
+                "message": "Invalid Flexible Discount Code",
+                "additionalDetails": ["Line Item: 4, Reason: NOT_FOUND"],
             },
         ),
     )
@@ -427,15 +446,20 @@ def test_get_preview_order_not_qualified_on_undiscounted_line(
     with pytest.raises(AdobeAPIError) as err:
         mocked_client.get_preview_order(authorization, "test-customer", payload)
 
-    assert err.value.code == "2141"
+    assert err.value.code == "2146"
 
 
-def test_get_preview_order_unexpected_message(
+@pytest.mark.parametrize(
+    "details",
+    [["line item 1, Reason: Invalid Flexible Discount"], []],
+)
+def test_get_preview_order_code_refused_without_line(
     adobe_client_factory,
     requests_mocker,
     settings,
-    order_preview_discounts_resp_factory,
     preview_discounts_payload_factory,
+    caplog,
+    details,
 ):
     mocked_client, authorization, _ = adobe_client_factory()
     payload_to_match = preview_discounts_payload_factory()
@@ -449,23 +473,53 @@ def test_get_preview_order_unexpected_message(
             matchers.query_param_matcher({"fetch-price": "true"}),
         ],
         body=AdobeAPIError(
-            status_code=int(AdobeErrorCode.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT),
+            status_code=400,
             payload={
                 "code": "2141",
                 "message": "Customer is not qualified for the Flexible Discount",
-                "additionalDetails": ["line item 1, Reason: Invalid Flexible Discount"],
+                "additionalDetails": details,
             },
         ),
     )
 
-    with pytest.raises(AdobeError) as err:
+    with pytest.raises(AdobeAPIError) as err:
         mocked_client.get_preview_order(authorization, "test-customer", payload_to_match)
 
-    assert str(err.value) == (
-        "Can't parse Adobe error message: '['line item 1, Reason: Invalid Flexible "
-        "Discount']'. Expected format example: 'Line Item: 2, Reason: Invalid "
-        "Flexible Discount'"
+    assert err.value.code == "2141"
+    assert err.value.details == details
+    assert any("can't find the line item" in message for message in caplog.messages)
+
+
+def test_get_preview_order_other_error_not_cascaded(
+    adobe_client_factory,
+    requests_mocker,
+    settings,
+    preview_discounts_payload_factory,
+):
+    mocked_client, authorization, _ = adobe_client_factory()
+    payload = preview_discounts_payload_factory()
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/customers/test-customer/orders",
+        ),
+        match=[matchers.json_params_matcher(payload)],
+        body=AdobeAPIError(
+            status_code=400,
+            payload={
+                "code": AdobeErrorCode.INVALID_FIELDS,
+                "message": "Invalid fields",
+                "additionalDetails": ["Line Item: 3, Reason: Invalid offer"],
+            },
+        ),
     )
+    cascade = FlexDiscountCascade(candidates={3: ["BLACK_FRIDAY", "CYBER_MONDAY"]})
+
+    with pytest.raises(AdobeAPIError) as err:
+        mocked_client.get_preview_order(authorization, "test-customer", payload, cascade)
+
+    assert err.value.code == AdobeErrorCode.INVALID_FIELDS
+    assert cascade.rejections == {}
 
 
 def test_get_preview_order_line_item(
