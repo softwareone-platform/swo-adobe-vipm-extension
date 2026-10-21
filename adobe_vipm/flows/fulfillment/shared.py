@@ -2142,6 +2142,9 @@ class SetupRenewalPlan(Step):
             # Set by the wizard's Undo: the customer removed the code, so the codes
             # stored on the subscription are cleared rather than left untouched.
             "clear_flex_discount_codes": bool(entry.get("clearFlexDiscountCodes")),
+            # A deployment subscription's lines carry its deployment and currency.
+            "deployment_id": adobe_subscription.get("deploymentId"),
+            "currency_code": adobe_subscription.get("currencyCode"),
             "snapshot": {
                 "enabled": auto_renewal.get("enabled", False),
                 "renewal_quantity": auto_renewal.get(Param.RENEWAL_QUANTITY.value),

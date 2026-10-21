@@ -344,7 +344,7 @@ class OrderClientMixin:
         payload = {
             "externalReferenceId": external_reference_id,
             "orderType": order_type,
-            "lineItems": line_items,
+            "lineItems": self._get_renewal_line_items(line_items, authorization),
         }
         if not any(line_item.get("deploymentId") for line_item in line_items):
             payload["currencyCode"] = authorization.currency
@@ -401,7 +401,7 @@ class OrderClientMixin:
         payload = {
             "externalReferenceId": external_reference_id,
             "orderType": adobe_constants.ORDER_TYPE_PREVIEW_RENEWAL,
-            "lineItems": line_items,
+            "lineItems": self._get_renewal_line_items(line_items, authorization),
         }
         if not any(line_item.get("deploymentId") for line_item in line_items):
             payload["currencyCode"] = authorization.currency
@@ -1139,6 +1139,24 @@ class OrderClientMixin:
             next_url = page.get("links", {}).get("next", {}).get("uri")
             query_params = None
         return flex_discounts
+
+    def _get_renewal_line_items(
+        self, line_items: list[dict], authorization: Authorization
+    ) -> list[dict]:
+        """
+        Return renewal line items with a currencyCode on every deployment line.
+
+        A deployment line carries its currency on the line, not on the order. A line
+        that already has one (taken from its Adobe subscription) keeps it; one that
+        has none (a net-new item) gets the authorization currency, which for a
+        deployment agreement is the deployment's currency.
+        """
+        return [
+            {**line_item, "currencyCode": authorization.currency}
+            if line_item.get("deploymentId") and not line_item.get("currencyCode")
+            else line_item
+            for line_item in line_items
+        ]
 
     def _update_payload_by_deployment(
         self, authorization: Authorization, deployment_id: str | None, payload: dict[str, Any]

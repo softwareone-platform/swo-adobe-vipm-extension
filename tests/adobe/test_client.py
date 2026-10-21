@@ -1425,6 +1425,56 @@ def test_create_renewal_order_with_deployment(
     assert result == adobe_order
 
 
+def test_create_renewal_order_adds_currency_to_deployment_line_without_it(
+    mocker,
+    settings,
+    requests_mocker,
+    adobe_authorizations_file,
+    adobe_client_factory,
+    adobe_order_factory,
+):
+    """A deployment line with no currencyCode (a net-new item) gets the authorization currency."""
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        return_value="uuid-1",
+    )
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    customer_id = "a-customer"
+    renewing_line = {
+        "offerId": "65304578CA01A12",
+        "quantity": 10,
+        "subscriptionId": "a-sub-id",
+        "deploymentId": "1400000194",
+        "currencyCode": "EUR",
+    }
+    net_new_line = {"offerId": "65322651CA01A12", "quantity": 5, "deploymentId": "1400000194"}
+    client, authorization, _ = adobe_client_factory()
+    expected_payload = {
+        "externalReferenceId": "mpt-order-id",
+        "orderType": ORDER_TYPE_RENEWAL,
+        "lineItems": [renewing_line, {**net_new_line, "currencyCode": authorization.currency}],
+    }
+    adobe_order = adobe_order_factory(ORDER_TYPE_RENEWAL)
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
+        ),
+        status=202,
+        json=adobe_order,
+        match=[matchers.json_params_matcher(expected_payload)],
+    )
+
+    result = client.create_renewal_order(
+        authorization_uk,
+        customer_id,
+        "mpt-order-id",
+        [renewing_line, net_new_line],
+    )  # act
+
+    assert result == adobe_order
+
+
 def test_create_renewal_order_bad_request(
     requests_mocker,
     settings,
