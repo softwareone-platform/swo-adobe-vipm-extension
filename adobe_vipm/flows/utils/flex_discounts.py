@@ -202,6 +202,7 @@ def get_flex_discount_candidates(  # noqa: WPS211
     market_segment: str,
     customer_id: str | None,
     country: str,
+    currency: str,
     commitment: CommitmentType,
     new_lines: list[dict],
     upsize_lines: list[dict],
@@ -217,6 +218,7 @@ def get_flex_discount_candidates(  # noqa: WPS211
         market_segment: Adobe market segment (COM, GOV, EDU).
         customer_id: Adobe customer id, None when the customer does not exist yet.
         country: Country the discounts are looked up for (see get_discount_country).
+        currency: The order currency fixed amounts must be expressed in.
         commitment: The customer's commitment term (see get_commitment_type).
         new_lines: MPT order lines purchased as new.
         upsize_lines: MPT order lines increased in quantity.
@@ -239,6 +241,7 @@ def get_flex_discount_candidates(  # noqa: WPS211
             line_partial_sku=line["item"]["externalIds"]["vendor"],
             line_type=line_type,
             country=country,
+            currency=currency,
             commitment=commitment,
             owned_partial_skus=owned_partial_skus,
         )
@@ -252,6 +255,7 @@ def get_renewal_flex_discount_candidates(  # noqa: WPS211
     market_segment: str,
     customer_id: str,
     country: str,
+    currency: str,
     commitment: CommitmentType,
     renewal_lines: dict[str, dict],
     owned_partial_skus: set[str] | None = None,
@@ -267,6 +271,7 @@ def get_renewal_flex_discount_candidates(  # noqa: WPS211
         market_segment: Adobe market segment (COM, GOV, EDU).
         customer_id: Adobe customer id.
         country: Country the discounts are looked up for (see get_discount_country).
+        currency: The order currency fixed amounts must be expressed in.
         commitment: The customer's commitment term (see get_commitment_type).
         renewal_lines: Late-renewal info per partial SKU (context.manual_renewal_lines).
         owned_partial_skus: Partial SKUs the customer already owns, None when unknown.
@@ -286,6 +291,7 @@ def get_renewal_flex_discount_candidates(  # noqa: WPS211
             line_partial_sku=sku,
             line_type=LineType.RENEWAL,
             country=country,
+            currency=currency,
             commitment=commitment,
             owned_partial_skus=owned_partial_skus,
         )
@@ -318,6 +324,7 @@ def filter_candidates(  # noqa: WPS211
     line_partial_sku: str,
     line_type: LineType,
     country: str,
+    currency: str,
     commitment: CommitmentType,
     owned_partial_skus: set[str] | None = None,
     today: dt.date | None = None,
@@ -332,6 +339,7 @@ def filter_candidates(  # noqa: WPS211
         line_partial_sku: The line's 10-char partial SKU.
         line_type: NEW, UPSIZE or RENEWAL.
         country: Country the discounts are looked up for.
+        currency: The order currency fixed amounts must be expressed in.
         commitment: The customer's commitment term.
         owned_partial_skus: Partial SKUs the customer already owns, None when unknown.
         today: Reference date for the validity window, defaults to today (UTC).
@@ -351,13 +359,15 @@ def filter_candidates(  # noqa: WPS211
             line_partial_sku=line_partial_sku,
             line_type=line_type,
             country=country,
+            currency=currency,
             commitment=commitment,
             owned_partial_skus=owned_partial_skus,
             redeemed=row.code in redeemed_codes,
             today=today,
         ):
             continue
-        candidates.append(_to_candidate(row, _select_amount(amounts, country), redeemed_codes))
+        amount = _select_amount(row, amounts, country, currency)
+        candidates.append(_to_candidate(row, amount, redeemed_codes))
     return candidates
 
 
@@ -368,6 +378,7 @@ def _is_eligible(  # noqa: WPS211
     line_partial_sku: str,
     line_type: LineType,
     country: str,
+    currency: str,
     commitment: CommitmentType,
     owned_partial_skus: set[str] | None,
     redeemed: bool,
@@ -380,7 +391,7 @@ def _is_eligible(  # noqa: WPS211
         allows_order_type(row, line_type),
         allows_category(row, line_type),
         is_within_window(row, today, held=bool(row.reusable) and redeemed),
-        is_offered_in_country(amounts, country),
+        is_offered_in_country(row, amounts, country, currency),
         is_redeemable(row, redeemed=redeemed),
         matches_commitment(row, commitment),
     )
@@ -444,15 +455,19 @@ def is_within_window(row, today: dt.date, *, held: bool = False) -> bool:
     return usable_until is None or today <= usable_until
 
 
-def is_offered_in_country(amounts: list, country: str) -> bool:
+def is_offered_in_country(row, amounts: list, country: str, currency: str) -> bool:
     """
-    Keep a code priced in the country.
+    Keep a code priced in the country and, when fixed, in the order currency.
 
     A code is offered in a country when it has a value row for it or a
-    country-agnostic (percentage) row. A code with no value rows is kept:
-    it cannot be priced locally, but the data gap must not hide it.
+    country-agnostic (percentage) row. A fixed code's row must also be
+    expressed in the order currency: Adobe rejects a code it cannot price
+    in it. A code with no value rows is kept: it cannot be priced locally,
+    but the data gap must not hide it.
     """
-    return not amounts or any(_is_amount_for_country(amount, country) for amount in amounts)
+    return not amounts or any(
+        _is_usable_amount(row, amount, country, currency) for amount in amounts
+    )
 
 
 def is_redeemable(row, *, redeemed: bool) -> bool:
@@ -500,12 +515,20 @@ def _group_amounts_by_code(discount_values: list) -> dict[str, list]:
     return amounts_by_code
 
 
-def _select_amount(amounts: list, country: str):
+def _select_amount(row, amounts: list, country: str, currency: str):
     """Pick the country row of a fixed code, or the country-less row of a percentage one."""
-    country_amounts = [amount for amount in amounts if amount.country == country]
+    usable_amounts = [
+        amount for amount in amounts if _is_usable_amount(row, amount, country, currency)
+    ]
+    country_amounts = [amount for amount in usable_amounts if amount.country == country]
     if country_amounts:
         return country_amounts[0]
-    return next((amount for amount in amounts if not amount.country), None)
+    return next((amount for amount in usable_amounts if not amount.country), None)
+
+
+def _is_usable_amount(row, amount, country: str, currency: str) -> bool:
+    in_currency = row.discount_type == DISCOUNT_TYPE_PERCENTAGE or amount.currency == currency
+    return in_currency and _is_amount_for_country(amount, country)
 
 
 def _is_amount_for_country(amount, country: str) -> bool:
@@ -551,6 +574,7 @@ def select_flex_discounts(
         market_segment=context.market_segment,
         customer_id=context.adobe_customer_id,
         country=get_discount_country(customer_data),
+        currency=context.currency,
         commitment=get_commitment_type(context.adobe_customer, customer_data),
         new_lines=context.new_lines,
         upsize_lines=context.upsize_lines,
@@ -610,6 +634,7 @@ def select_renewal_flex_discounts(
         market_segment=context.market_segment,
         customer_id=context.adobe_customer_id,
         country=get_discount_country(customer_data),
+        currency=context.currency,
         commitment=get_commitment_type(context.adobe_customer, customer_data),
         renewal_lines=context.manual_renewal_lines,
         owned_partial_skus=owned_partial_skus,
