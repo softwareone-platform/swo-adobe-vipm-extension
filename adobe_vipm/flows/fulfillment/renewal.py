@@ -26,8 +26,8 @@ from mpt_extension_sdk.mpt_http.mpt import create_subscription
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
+    FLEX_DISCOUNT_REFUSAL_ERROR_CODES,
     ORDER_TYPE_PREVIEW_RENEWAL,
-    AdobeErrorCode,
     AdobeSubscriptionStatus,
     ThreeYearCommitmentStatus,
 )
@@ -434,11 +434,7 @@ class ValidateRenewalDiscountCodes(Step):
     RecordDiscountRedemptions.
     """
 
-    refusal_error_codes = frozenset((
-        AdobeErrorCode.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT,
-        AdobeErrorCode.INVALID_FLEX_DISCOUNT_CODE,
-        AdobeErrorCode.FLEX_DISCOUNT_CODE_LIMIT_EXCEEDED,
-    ))
+    refusal_error_codes = FLEX_DISCOUNT_REFUSAL_ERROR_CODES
 
     def __call__(self, client, context, next_step):
         """Ask Adobe whether it will honour every discount code of the plan."""

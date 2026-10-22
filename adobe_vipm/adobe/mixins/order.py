@@ -92,7 +92,7 @@ def _get_max_previews(payload: dict, cascade: FlexDiscountCascade) -> int:
 class OrderClientMixin:
     """Adobe Client Mixin to manage Orders flows of Adobe VIPM."""
 
-    flex_discount_not_qualify_re = re.compile(r"Line Item: ?(\d+)", re.IGNORECASE)
+    flex_discount_line_item_re = re.compile(r"Line Item: ?(\d+)", re.IGNORECASE)
 
     @wrap_http_error
     def get_orders(self, authorization_id: str, customer_id: str, filters: dict | None = None):
@@ -853,7 +853,7 @@ class OrderClientMixin:
         try:
             response_json = self._get_preview_order(authorization, adobe_customer_id, payload)
         except AdobeError as ex:
-            rejected = self._get_rejected_codes_for_not_qualified(ex, payload)
+            rejected = self._get_rejected_codes_from_error(ex, payload)
             if not self._cascade_rejected_codes(payload, cascade, rejected):
                 raise
             return None, True
@@ -891,20 +891,24 @@ class OrderClientMixin:
             changed = True
         return changed
 
-    def _get_rejected_codes_for_not_qualified(
-        self, ex: AdobeError, payload: dict
-    ) -> dict[int, set[str]]:
-        """Map Adobe's 2141 rejection to the code the payload proposes on the line it names."""
+    def _get_rejected_codes_from_error(self, ex: AdobeError, payload: dict) -> dict[int, set[str]]:
+        """
+        Map Adobe's code refusal (2141, 2146, 2147) to the code proposed on the line it names.
+
+        Any other error, or a refusal whose details name no line, is re-raised as is.
+        """
         error_code = getattr(ex, "code", None)
-        if error_code != adobe_constants.AdobeErrorCode.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT:
+        if error_code not in adobe_constants.FLEX_DISCOUNT_REFUSAL_ERROR_CODES:
             raise ex
         logger.warning("%s", ex)
-        matched = self.flex_discount_not_qualify_re.match(ex.details[0])
+        matched = self.flex_discount_line_item_re.match(ex.details[0]) if ex.details else None
         if not matched:
-            raise AdobeError(
-                f"Can't parse Adobe error message: '{ex.details}'. Expected format example:"
-                f" 'Line Item: 2, Reason: Invalid Flexible Discount'"
+            logger.warning(
+                "Flex discounts: can't find the line item in Adobe error details %s. Expected "
+                "format example: 'Line Item: 2, Reason: Invalid Flexible Discount'",
+                ex.details,
             )
+            raise ex
         line_number = int(matched.group(1))
         code = _get_line_code(payload, line_number)
         return {line_number: {code}} if code else {}
