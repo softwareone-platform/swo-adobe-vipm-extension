@@ -939,9 +939,11 @@ class ReturnPreviousRenewalOrders(Step):
     Disabling its auto-renewal is not enough — the already-paid renewal must
     be undone, so this step submits a RETURN order referencing that previous
     RENEWAL order, returning only the lapsing subscription's line (other
-    lines of that order stay renewed) for its current ``remainingQuantity``,
-    so a line already partly returned or reduced by a switch plan is not
-    rejected by Adobe; a line with nothing left to return is skipped. Runs
+    lines of that order stay renewed) for the seats ResolvePreviousRenewalReturns
+    planned for it: its ``remainingQuantity`` capped at the seats still to
+    return, so neither more seats than the history check covered are returned
+    nor a line already partly returned or reduced by a switch plan is rejected
+    by Adobe; a line with nothing left to return is skipped. Runs
     after SubmitRenewalNowOrder so the additive operation always precedes the
     subtractive one.
 
@@ -1032,7 +1034,7 @@ class ReturnPreviousRenewalOrders(Step):
                 returning_line,
                 context.order_id,
                 returning_line.get("deploymentId"),
-                quantity=get_line_remaining_quantity(returning_line),
+                quantity=candidate["quantity"],
             )
         except POST_COMMIT_ADOBE_ERRORS as error:
             logger.warning(
