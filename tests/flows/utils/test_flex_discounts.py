@@ -60,6 +60,7 @@ def run_filter(codes, values=(), redemptions=(), **overrides):
         "line_partial_sku": "65304578CA",
         "line_type": LineType.NEW,
         "country": "US",
+        "currency": "USD",
         "commitment": CommitmentType.ANNUAL,
         "today": TODAY,
     }
@@ -215,6 +216,35 @@ def test_filter_candidates_country_gate_keeps_country_and_percentage_rows():
     assert (result[0].amount, result[0].currency) == (20, "USD")
     assert (result[1].amount, result[1].currency) == (10, None)
     assert (result[2].amount, result[2].currency) == (None, None)
+
+
+@pytest.mark.parametrize(
+    ("discount_type", "values", "expected"),
+    [
+        ("FIXED_PRICE", [make_value(country="US", currency="GBP", value=50)], None),
+        ("FIXED_DISCOUNT", [make_value(country="US", currency="GBP", value=50)], None),
+        ("FIXED_PRICE", [make_value(country="US", currency="USD", value=50)], (50, "USD")),
+        ("FIXED_DISCOUNT", [make_value(country="US", currency="USD", value=50)], (50, "USD")),
+        ("PERCENTAGE", [make_value(value=10)], (10, None)),
+        ("PERCENTAGE", [make_value(country="US", currency="GBP", value=10)], (10, "GBP")),
+        ("FIXED_PRICE", [], (None, None)),
+    ],
+)
+def test_filter_candidates_currency_gate(discount_type, values, expected):
+    result = run_filter([make_code(discount_type=discount_type)], values)  # act
+
+    assert [(c.amount, c.currency) for c in result] == ([] if expected is None else [expected])
+
+
+def test_filter_candidates_picks_country_row_in_order_currency():
+    values = [
+        make_value(country="US", currency="GBP", value=40),
+        make_value(country="US", currency="USD", value=50),
+    ]
+
+    result = run_filter([make_code(discount_type="FIXED_PRICE")], values)  # act
+
+    assert (result[0].amount, result[0].currency) == (50, "USD")
 
 
 def test_filter_candidates_prefers_country_row_over_country_less_row():
@@ -420,6 +450,7 @@ def test_get_flex_discount_candidates(mocker):
         market_segment="COM",
         customer_id="P100",
         country="US",
+        currency="USD",
         commitment=CommitmentType.ANNUAL,
         new_lines=[new_line, no_match_line],
         upsize_lines=[upsize_line],
@@ -458,6 +489,7 @@ def test_get_flex_discount_candidates_filters_qualifying_offers(mocker):
         market_segment="COM",
         customer_id="P100",
         country="US",
+        currency="USD",
         commitment=CommitmentType.ANNUAL,
         new_lines=[new_line],
         upsize_lines=[],
@@ -474,6 +506,7 @@ def test_get_flex_discount_candidates_without_lines(mocker):
         market_segment="COM",
         customer_id="P100",
         country="US",
+        currency="USD",
         commitment=CommitmentType.ANNUAL,
         new_lines=[],
         upsize_lines=[],
@@ -510,6 +543,7 @@ def test_get_renewal_flex_discount_candidates(mocker):
         market_segment="COM",
         customer_id="P100",
         country="US",
+        currency="USD",
         commitment=CommitmentType.ANNUAL,
         renewal_lines=renewal_lines,
     )  # act
@@ -518,6 +552,45 @@ def test_get_renewal_flex_discount_candidates(mocker):
         "65304578CA": ["BONUS_10"],
     }
     mocked_codes.assert_called_once_with("COM", "P100")
+
+
+def test_get_renewal_flex_discount_candidates_applies_currency_gate(mocker):
+    codes = [
+        make_code(code=code, discount_type=discount_type, applicable_order_types=["RENEWAL"])
+        for code, discount_type in (
+            ("FIXED_GBP", "FIXED_PRICE"),
+            ("FIXED_USD", "FIXED_PRICE"),
+            ("PERCENT", "PERCENTAGE"),
+            ("UNPRICED", "FIXED_PRICE"),
+        )
+    ]
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_visible_discount_codes",
+        return_value=codes,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_discount_values",
+        return_value=[
+            make_value("FIXED_GBP", country="US", currency="GBP", value=50),
+            make_value("FIXED_USD", country="US", currency="USD", value=50),
+            make_value("PERCENT", value=10),
+        ],
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_customer_discount_redemptions",
+        return_value=[],
+    )
+
+    result = get_renewal_flex_discount_candidates(
+        market_segment="COM",
+        customer_id="P100",
+        country="US",
+        currency="USD",
+        commitment=CommitmentType.ANNUAL,
+        renewal_lines={"65304578CA": {"offer_id": "65304578CA01A12"}},
+    )  # act
+
+    assert [c.code for c in result["65304578CA"]] == ["FIXED_USD", "PERCENT", "UNPRICED"]
 
 
 def test_get_renewal_flex_discount_candidates_filters_qualifying_offers(mocker):
@@ -542,6 +615,7 @@ def test_get_renewal_flex_discount_candidates_filters_qualifying_offers(mocker):
         market_segment="COM",
         customer_id="P100",
         country="US",
+        currency="USD",
         commitment=CommitmentType.ANNUAL,
         renewal_lines={"65304578CA": {"offer_id": "65304578CA01A12"}},
         owned_partial_skus={"A"},
@@ -557,6 +631,7 @@ def test_get_renewal_flex_discount_candidates_without_lines(mocker):
         market_segment="COM",
         customer_id="P100",
         country="US",
+        currency="USD",
         commitment=CommitmentType.ANNUAL,
         renewal_lines={},
     )  # act
@@ -726,6 +801,7 @@ def test_select_flex_discounts(mocker, order_factory, lines_factory, adobe_custo
         market_segment="COM",
         customer_id="P100",
         country=mocker.ANY,
+        currency="USD",
         commitment=mocker.ANY,
         new_lines=order["lines"],
         upsize_lines=[],
@@ -945,6 +1021,7 @@ def test_select_renewal_flex_discounts(mocker, order_factory, adobe_customer_fac
         market_segment="COM",
         customer_id="P100",
         country=mocker.ANY,
+        currency="USD",
         commitment=mocker.ANY,
         renewal_lines=manual_renewal_lines,
         owned_partial_skus={"65304521CA"},
