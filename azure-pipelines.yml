@@ -98,4 +98,6 @@ stages:
             parameters:
               repository: $(appName)
               buildNumber: $(buildVersion)
+              # InfraPortal product the build is registered under.
+              product: mpt-extensions
               components: []
