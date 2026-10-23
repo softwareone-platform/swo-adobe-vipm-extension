@@ -265,9 +265,11 @@ class ApplyRenewalDiscountCodes(Step):
     """
     Store the plan's discount codes on the renewing subscriptions, as one batch.
 
-    Adobe does not validate a code on update-subscription, so this only stages
-    the codes; ValidateRenewalDiscountCodes then asks Adobe whether it will
-    honour them before anything else changes. A plan entry without codes leaves
+    Adobe validates a code only partly on update-subscription, so this mostly
+    stages the codes; ValidateRenewalDiscountCodes then asks Adobe whether it
+    will honour them before anything else changes. A code Adobe already refuses
+    on the update (2141, 2146) fails the order naming the code, the same way the
+    preview's refusal does. A plan entry without codes leaves
     the codes the subscription holds untouched (inherited reusables), unless
     the customer removed them in the wizard (``clear_flex_discount_codes``),
     which clears them with the reset flag. Codes already in place are skipped,
@@ -298,14 +300,7 @@ class ApplyRenewalDiscountCodes(Step):
                     error,
                 )
                 fail_renewal_order(
-                    client,
-                    adobe_client,
-                    context,
-                    get_flex_discount_limit_error(error)
-                    or ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED.to_dict(
-                        subscription_id=plan["subscription_id"],
-                        error=error.message,
-                    ),
+                    client, adobe_client, context, self._update_error(plan, update, error)
                 )
                 return
             logger.info(
@@ -316,6 +311,31 @@ class ApplyRenewalDiscountCodes(Step):
             )
 
         next_step(client, context)
+
+    def _update_error(self, plan, update, error):
+        """
+        Map a failed codes update to its validation error.
+
+        Adobe refuses some codes already when they are stored (2141, 2146); that
+        refusal names the codes and the subscription, like a refusal found by
+        ValidateRenewalDiscountCodes. Any other error is an auto-renewal update
+        failure.
+        """
+        limit_error = get_flex_discount_limit_error(error)
+        if limit_error:
+            return limit_error
+        codes = update.get("flex_discount_codes")
+        if codes and error.code in FLEX_DISCOUNT_REFUSAL_ERROR_CODES:
+            line_reasons = "; ".join(filter(None, refused_line_reasons(error).values()))
+            reason = refusal_reason(error, line_reasons)
+            refusals = "; ".join(
+                f"{code} on subscription {plan['subscription_id']} ({reason})" for code in codes
+            )
+            return ERR_RENEWAL_FLEX_DISCOUNT_REFUSED.to_dict(refusals=refusals)
+        return ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED.to_dict(
+            subscription_id=plan["subscription_id"],
+            error=error.message,
+        )
 
     def _codes_update(self, plan):
         """Return the update_subscription arguments for the plan's codes, or None."""
@@ -360,33 +380,59 @@ class _CodeVerdicts:
                 self.judge(code, code_results, f"new product {net_new_item['offerId']}")
 
     def refuse_request(self, error, net_new_items):
-        """
-        Record the net-new codes of a preview Adobe refused as a whole.
-
-        Adobe refuses a net-new code by failing the whole request, naming the line
-        in additionalDetails ("Line Item: N, Reason: ..."); without a line number
-        every net-new code of the preview counts as refused.
-        """
-        refused_numbers = refused_line_numbers(error)
+        """Record the net-new codes of a preview Adobe refused as a whole."""
+        codes_by_line = {}
+        labels = {}
         for number, net_new_item in enumerate(net_new_items, start=1):
-            if refused_numbers and number not in refused_numbers:
-                continue
-            offer_id = net_new_item["offerId"]
-            self.refusals.extend(
-                f"{code} on new product {offer_id} ({error.message})"
-                for code in net_new_item["flexDiscountCodes"]
-            )
+            codes_by_line[number] = net_new_item["flexDiscountCodes"]
+            labels[number] = f"new product {net_new_item['offerId']}"
+        self.refusals.extend(describe_refused_codes(error, codes_by_line, labels))
 
 
-def refused_line_numbers(error):
-    """Read the line numbers Adobe named in a refusal's ``Line Item: N`` details."""
-    numbers = set()
+def refused_line_reasons(error):
+    """
+    Read the lines Adobe named in a refusal's ``Line Item: N, Reason: ...`` details.
+
+    Maps each named line number to Adobe's reason for it (empty when none is given).
+    """
+    reasons = {}
     for detail in error.details:
-        head = str(detail).split(",", maxsplit=1)[0].strip()
+        head, _, tail = str(detail).partition(",")
+        head = head.strip()
         digits = head.removeprefix("Line Item:").strip()
         if head.startswith("Line Item:") and digits.isdigit():
-            numbers.add(int(digits))
-    return numbers
+            reasons[int(digits)] = tail.strip().removeprefix("Reason:").strip()
+    return reasons
+
+
+def refusal_reason(error, line_reason=""):
+    """Describe why Adobe refused a code: its message, plus the line's reason if any."""
+    return f"{error.message}: {line_reason}" if line_reason else error.message
+
+
+def describe_refused_codes(error, codes_by_line, labels):
+    """
+    Describe the requested codes of a request Adobe refused with a flex discount error.
+
+    Adobe refuses a code by failing the whole request, naming the line in
+    additionalDetails ("Line Item: N, Reason: ..."); only that line's codes
+    count as refused, and without a line number every line's codes do. Each
+    description names the code, its line (``labels``) and Adobe's reason.
+    """
+    reasons = refused_line_reasons(error)
+    refusals = []
+    for number, codes in codes_by_line.items():
+        if reasons and number not in reasons:
+            continue
+        refusals.extend(
+            _describe_line_refusals(error, codes, labels[number], reasons.get(number, ""))
+        )
+    return refusals
+
+
+def _describe_line_refusals(error, codes, label, line_reason):
+    reason = refusal_reason(error, line_reason)
+    return [f"{code} on {label} ({reason})" for code in codes]
 
 
 def find_preview_subscription_line(line_items, plan):

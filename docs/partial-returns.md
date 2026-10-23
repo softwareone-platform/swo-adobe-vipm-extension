@@ -77,11 +77,11 @@ written when the line completes. A subscription in its renewal window
 | Transport error, 5xx | Re-raised; the order stays in Processing and is retried |
 | `RETURN_QTY_EXCEEDS_REMAINING`, or a RETURN ending `1004` | Re-plan the line once per run |
 | Any other rejection (for example `RETURN_NOT_SUPPORTED_MOQ_SKU`) before the line is credited | The line is deferred |
-| `RETURN_VIOLATES_3YC_MCQ` with nothing credited | Order fails with `VIPM0056` |
-| Any rejection after part of the order was credited | Order fails with `VIPM0055` |
+| `RETURN_VIOLATES_3YC_MCQ` with nothing credited | Order fails with `VIPM0059` |
+| Any rejection after part of the order was credited | Order fails with `VIPM0058` |
 
 A failed order keeps the returns already made; no compensating order is
-placed. The `VIPM0055` message lists every line as `RETURNED`, `PARTIAL`,
+placed. The `VIPM0058` message lists every line as `RETURNED`, `PARTIAL`,
 `NOT PROCESSED` or `DEFERRED` with its RETURN order ids. A Teams notification is
 sent and the agreement is synced so MPT quantities match Adobe.
 

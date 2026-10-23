@@ -502,13 +502,13 @@ ERR_RENEWAL_RETURN_WINDOW_CLOSED = ValidationError(
 )
 
 ERR_PARTIAL_RETURN_INCOMPLETE = ValidationError(
-    "VIPM0055",
+    "VIPM0058",
     "The downsize could not be completed after part of it was already returned to Adobe. "
     "Returned lines were not undone. {details}. Error: {error}.",
 )
 
 ERR_RETURN_VIOLATES_3YC = ValidationError(
-    "VIPM0056",
+    "VIPM0059",
     "Adobe rejected the return because it would reduce the three-year commitment below its "
     "minimum commit quantity: {error}.",
 )
