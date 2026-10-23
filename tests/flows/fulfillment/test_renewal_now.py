@@ -14,6 +14,8 @@ from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError, AdobeTranspor
 from adobe_vipm.flows.constants import (
     ERR_DUE_DATE_REACHED,
     ERR_RENEWAL_NET_NEW_FAILED,
+    ERR_RENEWAL_NOW_FLEX_DISCOUNT_REFUSED,
+    ERR_RENEWAL_PREVIEW_FAILED,
     ERR_RENEWAL_RETURN_FAILED,
     ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED,
     TEMPLATE_NAME_CHANGE,
@@ -419,6 +421,65 @@ def test_preview_renewal_now_order_step_preview_failed(
     mocked_next_step.assert_not_called()
 
 
+def test_preview_renewal_now_order_step_names_the_code_adobe_refused_on_the_request(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context, adobe_api_error_factory
+):
+    renewal_now_context.renewal_plan_subscriptions = [
+        plan_entry(flex_discount_codes=["BAD-CODE"]),
+        plan_entry(subscription_id="other-sub-id", flex_discount_codes=["GOOD-CODE"]),
+    ]
+    mock_adobe_client.create_renewal_order.side_effect = AdobeAPIError(
+        400,
+        adobe_api_error_factory(
+            code=AdobeErrorCode.INVALID_FLEX_DISCOUNT_CODE.value,
+            message="Invalid Flexible Discount Code",
+            details=["Line Item: 1, Reason: NOT_FOUND"],
+        ),
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal_now.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+
+    PreviewRenewalNowOrder()(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    error = mocked_switch_to_failed.mock_calls[0].args[2]
+    assert error["id"] == ERR_RENEWAL_NOW_FLEX_DISCOUNT_REFUSED.id
+    assert (
+        "BAD-CODE on subscription renewing-sub-id (Invalid Flexible Discount Code: NOT_FOUND)"
+        in error["message"]
+    )
+    assert "GOOD-CODE" not in error["message"]
+    mock_adobe_client.create_renewal_order.assert_called_once()
+    assert renewal_now_context.preview_renewal_order is None
+    mocked_next_step.assert_not_called()
+
+
+def test_preview_renewal_now_order_step_refusal_without_selected_code_keeps_preview_error(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context, adobe_api_error_factory
+):
+    renewal_now_context.renewal_plan_subscriptions = [plan_entry()]
+    mock_adobe_client.create_renewal_order.side_effect = AdobeAPIError(
+        400,
+        adobe_api_error_factory(
+            code=AdobeErrorCode.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT.value,
+            message="Customer is not qualified for the Flexible Discount",
+            details=["Line Item: 1, Reason: INELIGIBLE_COMMITMENT_STATUS"],
+        ),
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal_now.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+
+    PreviewRenewalNowOrder()(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    assert mocked_switch_to_failed.mock_calls[0].args[2] == ERR_RENEWAL_PREVIEW_FAILED.to_dict(
+        error="Customer is not qualified for the Flexible Discount"
+    )
+    mocked_next_step.assert_not_called()
+
+
 @pytest.mark.parametrize(
     ("flex_discounts", "reported"),
     [
@@ -804,6 +865,46 @@ def test_submit_renewal_now_order_step_flex_discount_limit_error(
     mocked_switch_to_failed.assert_called_once()
     message = mocked_switch_to_failed.mock_calls[0].args[2]["message"]
     assert "Only one flexible discount code per line item is allowed" in message
+    assert renewal_now_context.adobe_renewal_order is None
+    mocked_next_step.assert_not_called()
+
+
+def test_submit_renewal_now_order_step_names_the_code_adobe_refused_on_the_commit(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context, adobe_api_error_factory
+):
+    renewal_now_context.renewal_plan_subscriptions = [plan_entry(flex_discount_codes=["CODE-1"])]
+    renewal_now_context.preview_renewal_order = {
+        "lineItems": [
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "subscriptionId": "renewing-sub-id",
+                "quantity": 15,
+                "flexDiscounts": [{"code": "CODE-1", "result": "SUCCESS"}],
+            },
+        ],
+    }
+    mock_adobe_client.create_renewal_order.side_effect = AdobeAPIError(
+        400,
+        adobe_api_error_factory(
+            code=AdobeErrorCode.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT.value,
+            message="Customer is not qualified for the Flexible Discount",
+            details=["Line Item: 1, Reason: INELIGIBLE_COMMITMENT_STATUS"],
+        ),
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal_now.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+
+    SubmitRenewalNowOrder()(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    error = mocked_switch_to_failed.mock_calls[0].args[2]
+    assert error["id"] == ERR_RENEWAL_NOW_FLEX_DISCOUNT_REFUSED.id
+    assert (
+        "CODE-1 on subscription renewing-sub-id (Customer is not qualified for the "
+        "Flexible Discount: INELIGIBLE_COMMITMENT_STATUS)" in error["message"]
+    )
     assert renewal_now_context.adobe_renewal_order is None
     mocked_next_step.assert_not_called()
 
