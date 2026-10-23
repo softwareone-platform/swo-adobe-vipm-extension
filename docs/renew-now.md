@@ -167,6 +167,10 @@ and that the `PREVIEW_RENEWAL` response then **confirmed** with result
   result or a missing `flexDiscounts` entry does not. The renew-now `RENEWAL` is
   invoiced immediately, so committing without the code would bill the renewal at
   full price. Lines are matched to the request by `extLineItemNumber`.
+- When Adobe refuses the whole `PREVIEW_RENEWAL` or `RENEWAL` request for a
+  selected code (`2141` customer not qualified, `2146` invalid code), the order
+  also fails with `VIPM0056`, naming the code on the line Adobe reported and
+  Adobe's reason. `2147` keeps its own `VIPM0052`.
 - Reusable discounts the customer already holds are auto-applied by Adobe at
   renewal without any opt-in. The preview reports them alongside the requested
   ones, but they are never echoed back on the commit, so they are not
