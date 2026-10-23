@@ -17,6 +17,7 @@ from adobe_vipm.flows.constants import (
     ERR_RENEWAL_RETURN_FAILED,
     ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED,
     TEMPLATE_NAME_CHANGE,
+    Param,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.renewal import (
@@ -41,6 +42,8 @@ from adobe_vipm.flows.fulfillment.renewal_now import (
 )
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
+    DiscardCarriedOverFlexDiscounts,
+    NullifyFlexDiscountParam,
     SetOrUpdateCotermDate,
     SetSubscriptionTemplate,
     SetupDueDate,
@@ -53,7 +56,10 @@ from adobe_vipm.flows.fulfillment.shared import (
 )
 from adobe_vipm.flows.helpers import SetupContext
 from adobe_vipm.flows.pipeline import Cursor, Pipeline, get_failed_step
-from adobe_vipm.flows.utils.parameter import set_adobe_order_ids_created_parameter
+from adobe_vipm.flows.utils import get_fulfillment_parameter
+from adobe_vipm.flows.utils.parameter import (
+    set_adobe_order_ids_created_parameter,
+)
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
@@ -2736,6 +2742,102 @@ def test_submit_renewal_now_order_step_existing_order_still_open(
     mocked_next_step.assert_not_called()
 
 
+def renewal_line(number, subscription_id, offer_id, flex_discounts):
+    return {
+        "extLineItemNumber": number,
+        "offerId": offer_id,
+        "subscriptionId": subscription_id,
+        "quantity": 15,
+        "flexDiscounts": flex_discounts,
+    }
+
+
+def completed_renewal_order(line_items):
+    return {
+        "orderId": "renewal-order-id",
+        "status": AdobeOrderStatus.COMPLETE.value,
+        "lineItems": line_items,
+    }
+
+
+def test_submit_renewal_now_order_step_records_flex_discounts(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context_net_new
+):
+    renewal_now_context_net_new.renewal_plan_subscriptions = [
+        plan_entry(flex_discount_codes=["CODE-1"]),
+        plan_entry(
+            subscription_id="inherited-sub-id",
+            offer_id="65322651CA01A12",
+            flex_discount_codes=["INHERITED"],
+            snapshot_codes=["INHERITED"],
+        ),
+    ]
+    renewal_now_context_net_new.existing_renewal_order = completed_renewal_order([
+        renewal_line(
+            1,
+            "renewing-sub-id",
+            "65304578CA01A12",
+            [
+                {"code": "CODE-1", "result": "SUCCESS"},
+                {"code": "AUTO-APPLIED", "result": "SUCCESS"},
+            ],
+        ),
+        renewal_line(
+            2,
+            "inherited-sub-id",
+            "65322651CA01A12",
+            [{"code": "INHERITED", "result": "SUCCESS"}],
+        ),
+        renewal_line(
+            3, "net-new-sub-id", "65322651CA02A12", [{"code": "CODE-3", "result": "SUCCESS"}]
+        ),
+    ])
+    mocked_next_step = mocker.MagicMock()
+    step = SubmitRenewalNowOrder()
+
+    step(mock_mpt_client, renewal_now_context_net_new, mocked_next_step)  # act
+
+    flex_param = get_fulfillment_parameter(
+        renewal_now_context_net_new.order, Param.FLEXIBLE_DISCOUNTS.value
+    )
+    assert flex_param["value"] == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": "65304578CA01A12",
+            "subscriptionId": "renewing-sub-id",
+            "flexDiscountCode": ["CODE-1"],
+        },
+        {
+            "extLineItemNumber": 3,
+            "offerId": "65322651CA02A12",
+            "subscriptionId": "net-new-sub-id",
+            "flexDiscountCode": ["CODE-3"],
+        },
+    ]
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context_net_new)
+
+
+def test_submit_renewal_now_order_step_skips_unapplied_flex_discount_code(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context
+):
+    renewal_now_context.renewal_plan_subscriptions = [plan_entry(flex_discount_codes=["CODE-1"])]
+    renewal_now_context.existing_renewal_order = completed_renewal_order([
+        renewal_line(
+            1, "renewing-sub-id", "65304578CA01A12", [{"code": "CODE-1", "result": "FAILURE"}]
+        ),
+    ])
+    mocked_next_step = mocker.MagicMock()
+    step = SubmitRenewalNowOrder()
+
+    step(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    flex_param = get_fulfillment_parameter(
+        renewal_now_context.order, Param.FLEXIBLE_DISCOUNTS.value
+    )
+    assert flex_param["value"] is None
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
+
+
 def test_hold_on_outstanding_steps_step_nothing_outstanding(
     mocker, mock_mpt_client, renewal_now_context
 ):
@@ -2924,6 +3026,7 @@ def test_fulfill_renewal_now_order(mocker):
 
     expected_steps = [
         (SetupContext, None),
+        (DiscardCarriedOverFlexDiscounts, None),
         (StartOrderProcessing, None),
         (DetectCommittedRenewal, None),
         (SkipOnceRenewalCommitted, SetupDueDate),
@@ -2946,6 +3049,7 @@ def test_fulfill_renewal_now_order(mocker):
         (CompleteOrder, None),
         (RecordClientDiscountCodes, None),
         (RecordDiscountRedemptions, None),
+        (NullifyFlexDiscountParam, None),
         (SetSubscriptionTemplate, None),
         (SyncAgreement, None),
     ]
@@ -2956,11 +3060,11 @@ def test_fulfill_renewal_now_order(mocker):
         for step in pipeline_args
     ]
     assert actual_steps == expected_steps
-    assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
-    assert pipeline_args[10].step.include_net_new_items is True
-    assert pipeline_args[10].step.renewal_quantity_is_delta is True
-    assert pipeline_args[17].active_on_creation is True
-    assert pipeline_args[20].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[2].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[11].step.include_net_new_items is True
+    assert pipeline_args[11].step.renewal_quantity_is_delta is True
+    assert pipeline_args[18].active_on_creation is True
+    assert pipeline_args[21].template_name == TEMPLATE_NAME_CHANGE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
 

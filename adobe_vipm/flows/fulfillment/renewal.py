@@ -53,6 +53,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
+    NullifyFlexDiscountParam,
     SetOrUpdateCotermDate,
     SetSubscriptionTemplate,
     SetupDueDate,
@@ -1160,36 +1161,77 @@ class CreateNetNewMptSubscriptions(Step):
 
 class RecordFlexDiscounts(Step):
     """
-    Record the discount codes applied by the plan on the order.
+    Record the discount codes the plan applied on the order.
 
-    On confirmed completion the used flexDiscountCodes are written to the
-    order's flexibleDiscounts fulfillment parameter, persisted by the
-    CompleteOrder step that follows.
+    One entry per subscription holding a code this order applied: the renewing
+    subscriptions and the scheduled subscriptions created for the net-new items.
+    A code the subscription already carried before the order (inherited) was
+    not applied by it, and a code Adobe did not confirm was not applied at all,
+    so both are left out, matching the redemptions (get_redeemed_codes). The
+    codes ride subscription updates and creations rather than an Adobe order,
+    so the entries carry no extLineItemNumber, like the late-renewal entries
+    (set_renewal_flex_discounts_parameter). The value replaces whatever the
+    order carried over from the agreement and is persisted by the CompleteOrder
+    step that follows.
     """
 
     def __call__(self, client, context, next_step):
         """Record the discount codes applied by the plan on the order."""
-        flex_discounts = [
-            {
+        flex_discounts = [*_get_renewing_entries(context), *_get_net_new_entries(context)]
+        context.order = update_fulfillment_parameter_value(
+            context.order,
+            Param.FLEXIBLE_DISCOUNTS.value,
+            flex_discounts or None,
+        )
+        logger.info(
+            "%s: recorded %s flex discount entry(ies) on the order",
+            context,
+            len(flex_discounts),
+        )
+        next_step(client, context)
+
+
+def _get_renewing_entries(context):
+    """Build the flexibleDiscounts entries of the renewing subscriptions."""
+    entries = []
+    for plan in context.renewal_plan_subscriptions:
+        if not plan["renew"]:
+            continue
+        codes = _get_applied_codes(
+            context, plan["flex_discount_codes"], plan["snapshot"]["flex_discount_codes"]
+        )
+        if codes:
+            entries.append({
                 "offerId": plan["offer_id"],
                 "subscriptionId": plan["subscription_id"],
-                "flexDiscountCode": plan["flex_discount_codes"],
-            }
-            for plan in context.renewal_plan_subscriptions
-            if plan["renew"] and plan["flex_discount_codes"]
-        ]
-        if flex_discounts:
-            context.order = update_fulfillment_parameter_value(
-                context.order,
-                Param.FLEXIBLE_DISCOUNTS.value,
-                flex_discounts,
-            )
-            logger.info(
-                "%s: recorded %s flex discount entry(ies) on the order",
-                context,
-                len(flex_discounts),
-            )
-        next_step(client, context)
+                "flexDiscountCode": codes,
+            })
+    return entries
+
+
+def _get_net_new_entries(context):
+    """Build the flexibleDiscounts entries of the net-new scheduled subscriptions."""
+    entries = []
+    for net_new_item in (context.renewal_payload or {}).get("netNewItems", []):
+        subscription = context.renewal_net_new_subscriptions.get(net_new_item["offerId"])
+        codes = _get_applied_codes(context, net_new_item.get("flexDiscountCodes") or [], [])
+        if subscription and codes:
+            entries.append({
+                "offerId": net_new_item["offerId"],
+                "subscriptionId": subscription["subscriptionId"],
+                "flexDiscountCode": codes,
+            })
+    return entries
+
+
+def _get_applied_codes(context, codes, inherited_codes):
+    """Keep the codes this order applied: confirmed by Adobe and not inherited."""
+    confirmed_codes = get_confirmed_codes(context)
+    return [
+        code
+        for code in codes
+        if code not in inherited_codes and (confirmed_codes is None or code in confirmed_codes)
+    ]
 
 
 def get_redeemed_codes(context):
@@ -1503,6 +1545,7 @@ def fulfill_renewal_order(client, order):
         CompleteOrder(template_name),
         RecordClientDiscountCodes(),
         RecordDiscountRedemptions(),
+        NullifyFlexDiscountParam(),
         SetSubscriptionTemplate(),
         SyncAgreement(),
     )
