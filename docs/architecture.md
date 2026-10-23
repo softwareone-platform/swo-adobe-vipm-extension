@@ -112,6 +112,21 @@ Redemption reads and writes are best effort after order completion. Failures
 notify operations for manual backfill and allow agreement parameter cleanup and
 synchronization to continue.
 
+`flexibleDiscounts` is agreement-scoped, so the platform pre-fills a new order
+with the value the agreement still holds. Every flow that records codes on it
+clears the agreement value once the order completes (`NullifyFlexDiscountParam`):
+purchase, change, switch, reseller transfer and both renewal flows. Purchase,
+change, switch and renew now also discard a value the order did not write
+(`DiscardCarriedOverFlexDiscounts`, while the order has no Adobe order id yet),
+so a value left on an agreement is never read as this order's redemptions.
+Renew now records its codes the way `SubmitNewOrder` does, with
+`set_flex_discounts_parameter` on the completed `RENEWAL` order: one entry per
+line with its `extLineItemNumber`, restricted to the code the plan selected
+for the line (inherited codes excluded). The at-anniversary renewal places no
+Adobe order, so it records one entry per subscription it applied a code on,
+renewing and net-new alike, without `extLineItemNumber`, leaving out inherited
+codes and codes Adobe did not confirm.
+
 Mid-term upgrade (`SWITCH`) orders do not select candidates from the store: the
 `switchPayload` already carries at most one `flexDiscountCodes` entry per line
 item. `PREVIEW_SWITCH` validates those codes, and the `SWITCH` order commits
