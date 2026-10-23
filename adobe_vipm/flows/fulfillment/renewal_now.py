@@ -49,6 +49,7 @@ from mpt_extension_sdk.mpt_http.mpt import update_order
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
     CANCELLATION_WINDOW_DAYS,
+    FLEX_DISCOUNT_REFUSAL_ERROR_CODES,
     FLEX_DISCOUNT_RESULT_SUCCESS,
     ORDER_STATUS_DESCRIPTION,
     ORDER_TYPE_PREVIEW_RENEWAL,
@@ -78,6 +79,7 @@ from adobe_vipm.flows.fulfillment.renewal import (
     RecordDiscountRedemptions,
     Validate3YCRenewalFloor,
     ValidateNetNewOrderLines,
+    describe_refused_codes,
 )
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
@@ -371,14 +373,40 @@ def _get_committed_requested_codes(context, renewal_order):
     return requested_codes
 
 
-def _unconfirmed_code_refusals(context, preview_lines):
-    """Describe each code the plan selected that its preview line did not confirm."""
+def _get_line_labels(context):
+    """Map each submitted line's extLineItemNumber to its name in a refusal message."""
     labels = {
         number: f"subscription {plan['subscription_id']}"
         for number, plan in enumerate(_get_renewing_plans(context), start=1)
     }
     for number, net_new_item in _iter_net_new_lines(context):
         labels[number] = f"new product {net_new_item['offerId']}"
+    return labels
+
+
+def _get_request_error(context, error, fallback_error):
+    """
+    Map a PREVIEW_RENEWAL or RENEWAL request Adobe refused as a whole to its error.
+
+    A flex discount refusal (2141, 2146) of a code the plan selected names the
+    code and its line, like a per-line refusal found on the preview; 2147 keeps
+    its own error, and anything else is ``fallback_error``.
+    """
+    limit_error = get_flex_discount_limit_error(error)
+    if limit_error:
+        return limit_error
+    if error.code in FLEX_DISCOUNT_REFUSAL_ERROR_CODES:
+        refusals = describe_refused_codes(
+            error, _get_requested_flex_discount_codes(context), _get_line_labels(context)
+        )
+        if refusals:
+            return ERR_RENEWAL_NOW_FLEX_DISCOUNT_REFUSED.to_dict(refusals="; ".join(refusals))
+    return fallback_error.to_dict(error=error.message)
+
+
+def _unconfirmed_code_refusals(context, preview_lines):
+    """Describe each code the plan selected that its preview line did not confirm."""
+    labels = _get_line_labels(context)
     refusals = []
     for number, codes in _get_requested_flex_discount_codes(context).items():
         preview_line = preview_lines.get(number) or {}
@@ -530,8 +558,7 @@ class PreviewRenewalNowOrder(Step):
             switch_order_to_failed(
                 client,
                 context.order,
-                get_flex_discount_limit_error(error)
-                or ERR_RENEWAL_PREVIEW_FAILED.to_dict(error=error.message),
+                _get_request_error(context, error, ERR_RENEWAL_PREVIEW_FAILED),
             )
             return False
 
@@ -676,8 +703,7 @@ class SubmitRenewalNowOrder(Step):
             switch_order_to_failed(
                 client,
                 context.order,
-                get_flex_discount_limit_error(error)
-                or ERR_RENEWAL_ORDER_FAILED.to_dict(error=error.message),
+                _get_request_error(context, error, ERR_RENEWAL_ORDER_FAILED),
             )
             return None
 

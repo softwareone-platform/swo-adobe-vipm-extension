@@ -12,7 +12,10 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeTransportError
 from adobe_vipm.flows.constants import (
+    ERR_FLEX_DISCOUNT_CODE_LIMIT,
+    ERR_RENEWAL_FLEX_DISCOUNT_REFUSED,
     ERR_RENEWAL_PLANNED_DATE_PASSED,
+    ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED,
     ITEM_EXTERNAL_ID_EARLY_RENEWAL_NO_CHANGE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
@@ -433,6 +436,74 @@ def test_apply_renewal_discount_codes_step_adobe_error_reverses_and_fails(
     ]
     mocked_switch_to_failed.assert_called_once()
     assert "second-sub-id" in mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    mocked_next_step.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("error_code", "message", "details", "expected_error", "reported"),
+    [
+        (
+            AdobeErrorCode.INVALID_FLEX_DISCOUNT_CODE,
+            "Invalid Flexible Discount Code",
+            ["Line Item: 1, Reason: NOT_FOUND"],
+            ERR_RENEWAL_FLEX_DISCOUNT_REFUSED,
+            "BAD-CODE on subscription renewing-sub-id (Invalid Flexible Discount Code: NOT_FOUND)",
+        ),
+        (
+            AdobeErrorCode.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT,
+            "Customer is not qualified for the Flexible Discount",
+            ["Line Item: 1, Reason: INELIGIBLE_COMMITMENT_STATUS"],
+            ERR_RENEWAL_FLEX_DISCOUNT_REFUSED,
+            (
+                "BAD-CODE on subscription renewing-sub-id (Customer is not qualified for the "
+                "Flexible Discount: INELIGIBLE_COMMITMENT_STATUS)"
+            ),
+        ),
+        (
+            AdobeErrorCode.FLEX_DISCOUNT_CODE_LIMIT_EXCEEDED,
+            "Only one Flexible Discount Code is allowed per line item",
+            ["Line Item: 1"],
+            ERR_FLEX_DISCOUNT_CODE_LIMIT,
+            "Only one Flexible Discount Code is allowed per line item",
+        ),
+        (
+            AdobeErrorCode.INVALID_FIELDS,
+            "Invalid renewal state",
+            [],
+            ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED,
+            "auto-renewal preference of subscription renewing-sub-id: Invalid renewal state",
+        ),
+    ],
+)
+def test_apply_renewal_discount_codes_step_maps_the_update_error(  # noqa: WPS211
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    renewal_context,
+    adobe_api_error_factory,
+    error_code,
+    message,
+    details,
+    expected_error,
+    reported,
+):
+    """A code Adobe refuses on the update fails the order naming it; other errors do not."""
+    renewal_context.renewal_plan_subscriptions = [plan_entry(flex_discount_codes=["BAD-CODE"])]
+    mock_adobe_client.update_subscription.side_effect = [
+        AdobeAPIError(400, adobe_api_error_factory(error_code.value, message, details=details)),
+        {"subscriptionId": "renewing-sub-id"},
+    ]
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+
+    ApplyRenewalDiscountCodes()(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    error = mocked_switch_to_failed.mock_calls[0].args[2]
+    assert error["id"] == expected_error.id
+    assert reported in error["message"]
+    assert mock_adobe_client.update_subscription.call_count == 2
     mocked_next_step.assert_not_called()
 
 
