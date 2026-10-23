@@ -22,9 +22,11 @@ renewedQuantity) additionally has that order's line returned via a RETURN
 order, so the customer is not left paying for a renewal that is being
 toggled off; that previous line is located and checked against Adobe's
 14-day return window before anything is committed, so an order that cannot
-be undone fails with nothing to reverse. Once the order is completed, the
-flex discount codes redeemed by the plan are recorded on the AirTable
-redemptions table. Before anything is committed, the resulting renewing
+be undone fails with nothing to reverse. The flex discount codes the RENEWAL
+applied are recorded on the order's flexibleDiscounts parameter; once the order
+is completed, the codes redeemed by the plan are recorded on the AirTable
+redemptions table and the agreement's flexibleDiscounts value is cleared, so
+the next order does not inherit it. Before anything is committed, the resulting renewing
 aggregate is validated against the 3YC committed minimum
 (Validate3YCRenewalFloor, shared with the at-anniversary flow).
 
@@ -79,6 +81,8 @@ from adobe_vipm.flows.fulfillment.renewal import (
 )
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
+    DiscardCarriedOverFlexDiscounts,
+    NullifyFlexDiscountParam,
     SetOrUpdateCotermDate,
     SetSubscriptionTemplate,
     SetupDueDate,
@@ -99,6 +103,7 @@ from adobe_vipm.flows.utils.notification import notify_renewal_now_outstanding_s
 from adobe_vipm.flows.utils.parameter import (
     get_adobe_order_ids_created_parameter,
     set_adobe_order_ids_created_parameter,
+    set_flex_discounts_parameter,
 )
 from adobe_vipm.flows.utils.return_errors import is_transient_error
 
@@ -329,6 +334,41 @@ def _get_requested_flex_discount_codes(context):
     for number, net_new_item in _iter_net_new_lines(context):
         requested[number] = net_new_item.get("flexDiscountCodes") or []
     return requested
+
+
+def _get_committed_requested_codes(context, renewal_order):
+    """
+    Map each committed RENEWAL line's extLineItemNumber to the code the plan selected for it.
+
+    Feeds set_flex_discounts_parameter, so only that code counts as applied on
+    the line, never a discount Adobe auto-applied. A renewing line is matched
+    to its plan by subscriptionId, because its number can shift on a retry
+    (see _iter_net_new_lines), and a net-new line by its stable
+    extLineItemNumber. A code the renewing subscription already carried before
+    the order (inherited) was not applied by it and is left out.
+    """
+    plans = {
+        plan["subscription_id"]: plan
+        for plan in context.renewal_plan_subscriptions
+        if plan["renew"]
+    }
+    net_new_by_line = _get_net_new_line_map(context)
+    requested_codes = {}
+    for line_item in renewal_order.get("lineItems", []):
+        number = line_item.get("extLineItemNumber")
+        plan = plans.get(line_item.get("subscriptionId"))
+        if plan:
+            inherited_codes = plan["snapshot"]["flex_discount_codes"]
+            selected = [code for code in plan["flex_discount_codes"] if code not in inherited_codes]
+        else:
+            selected = (net_new_by_line.get(number) or {}).get("flexDiscountCodes") or []
+        line_codes = {
+            flex_discount.get("code") for flex_discount in line_item.get("flexDiscounts") or []
+        }
+        code = next((code for code in selected if code in line_codes), None)
+        if code:
+            requested_codes[number] = code
+    return requested_codes
 
 
 def _unconfirmed_code_refusals(context, preview_lines):
@@ -581,6 +621,11 @@ class SubmitRenewalNowOrder(Step):
     Net-new lines (offerId + quantity, no subscriptionId) ride this same order;
     their MPT subscriptions are created afterwards by
     ResolveNetNewRenewedSubscriptions and CreateNetNewMptSubscriptions.
+
+    Once the order is COMPLETE, the codes it applied are recorded on the order's
+    flexibleDiscounts parameter the way SubmitNewOrder records a NEW order's
+    (set_flex_discounts_parameter, see _get_committed_requested_codes), on every
+    attempt, and persisted by CompleteOrder.
     """
 
     def __call__(self, client, context, next_step):
@@ -604,6 +649,11 @@ class SubmitRenewalNowOrder(Step):
             return
 
         context.adobe_renewal_order = order
+        context.order = set_flex_discounts_parameter(
+            context.order,
+            order,
+            requested_codes=_get_committed_requested_codes(context, order),
+        )
         logger.info("%s: renewal order %s completed", context, order["orderId"])
         next_step(client, context)
 
@@ -1378,6 +1428,7 @@ def fulfill_renewal_now_order(client, order):
     """
     pipeline = Pipeline(
         SetupContext(),
+        DiscardCarriedOverFlexDiscounts(),
         StartOrderProcessing(TEMPLATE_NAME_CHANGE),
         DetectCommittedRenewal(),
         SkipOnceRenewalCommitted(SetupDueDate()),
@@ -1402,6 +1453,7 @@ def fulfill_renewal_now_order(client, order):
         CompleteOrder(TEMPLATE_NAME_CHANGE),
         RecordClientDiscountCodes(),
         RecordDiscountRedemptions(),
+        NullifyFlexDiscountParam(),
         SetSubscriptionTemplate(),
         SyncAgreement(),
     )

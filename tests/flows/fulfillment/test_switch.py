@@ -14,6 +14,7 @@ from adobe_vipm.flows.fulfillment.renewal import RecordDiscountRedemptions
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateSubscriptions,
+    DiscardCarriedOverFlexDiscounts,
     NullifyFlexDiscountParam,
     SetOrUpdateCotermDate,
     SetSubscriptionTemplate,
@@ -952,6 +953,7 @@ def test_fulfill_switch_order(mocker):
 
     expected_steps = [
         SetupContext,
+        DiscardCarriedOverFlexDiscounts,
         StartOrderProcessing,
         SetupDueDate,
         ValidateDuplicateLines,
@@ -975,7 +977,7 @@ def test_fulfill_switch_order(mocker):
     assert len(pipeline_args) == len(expected_steps)
     actual_steps = [type(step) for step in pipeline_args]
     assert actual_steps == expected_steps
-    assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
-    assert pipeline_args[14].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[2].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[15].template_name == TEMPLATE_NAME_CHANGE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)

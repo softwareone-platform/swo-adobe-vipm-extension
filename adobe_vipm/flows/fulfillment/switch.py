@@ -40,6 +40,7 @@ from adobe_vipm.flows.fulfillment.renewal import RecordDiscountRedemptions
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateSubscriptions,
+    DiscardCarriedOverFlexDiscounts,
     NullifyFlexDiscountParam,
     SetOrUpdateCotermDate,
     SetSubscriptionTemplate,
@@ -550,6 +551,7 @@ def fulfill_switch_order(client, order):
     """
     pipeline = Pipeline(
         SetupContext(),
+        DiscardCarriedOverFlexDiscounts(),
         StartOrderProcessing(TEMPLATE_NAME_CHANGE),
         SetupDueDate(),
         ValidateDuplicateLines(),

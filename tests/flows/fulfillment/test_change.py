@@ -21,6 +21,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateAssets,
     CreateOrUpdateSubscriptions,
+    DiscardCarriedOverFlexDiscounts,
     GetPreviewOrder,
     GetReturnOrders,
     NullifyFlexDiscountParam,
@@ -181,6 +182,7 @@ def test_fulfill_change_order(mocker):
 
     expected_steps = [
         SetupContext,
+        DiscardCarriedOverFlexDiscounts,
         StartOrderProcessing,
         SetupDueDate,
         ValidateDuplicateLines,
@@ -214,9 +216,9 @@ def test_fulfill_change_order(mocker):
     assert len(pipeline_args) == len(expected_steps)
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
-    assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
-    assert pipeline_args[24].template_name == TEMPLATE_NAME_CHANGE
-    assert pipeline_args[14].select_flex_discounts is True
+    assert pipeline_args[2].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[25].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[15].select_flex_discounts is True
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
 
