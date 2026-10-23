@@ -42,6 +42,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateAssets,
     CreateOrUpdateSubscriptions,
+    DiscardCarriedOverFlexDiscounts,
     GetPreviewOrder,
     GetReturnOrders,
     NullifyFlexDiscountParam,
@@ -81,6 +82,7 @@ from adobe_vipm.flows.utils.parameter import (
     get_fulfillment_parameter,
     get_ordering_parameter,
     set_adobe_order_ids_created_parameter,
+    update_fulfillment_parameter_value,
 )
 
 
@@ -2905,6 +2907,43 @@ def test_set_subscription_template_step_subscription_not_found(
 
     mock_get_template_data_by_adobe_subscription.assert_not_called()
     mocked_update_agreement_subscription.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+@pytest.fixture
+def carried_over_flex_discounts():
+    return [{"offerId": "65304578CA01A12", "subscriptionId": "sub-id", "flexDiscountCode": ["OLD"]}]
+
+
+def test_discard_carried_over_flex_discounts(
+    mocker, order_factory, mock_mpt_client, carried_over_flex_discounts
+):
+    mocked_next_step = mocker.MagicMock()
+    order = update_fulfillment_parameter_value(
+        order_factory(), Param.FLEXIBLE_DISCOUNTS.value, carried_over_flex_discounts
+    )
+    context = Context(order=order, adobe_new_order_id=None)
+
+    DiscardCarriedOverFlexDiscounts()(mock_mpt_client, context, mocked_next_step)  # act
+
+    flex_param = get_fulfillment_parameter(context.order, Param.FLEXIBLE_DISCOUNTS.value)
+    assert flex_param["value"] is None
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_discard_carried_over_flex_discounts_keeps_own_value(
+    mocker, order_factory, mock_mpt_client, carried_over_flex_discounts
+):
+    mocked_next_step = mocker.MagicMock()
+    order = update_fulfillment_parameter_value(
+        order_factory(), Param.FLEXIBLE_DISCOUNTS.value, carried_over_flex_discounts
+    )
+    context = Context(order=order, adobe_new_order_id="adobe-order-id")
+
+    DiscardCarriedOverFlexDiscounts()(mock_mpt_client, context, mocked_next_step)  # act
+
+    flex_param = get_fulfillment_parameter(context.order, Param.FLEXIBLE_DISCOUNTS.value)
+    assert flex_param["value"] == carried_over_flex_discounts
     mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 

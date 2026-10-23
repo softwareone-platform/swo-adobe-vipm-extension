@@ -102,6 +102,7 @@ from adobe_vipm.flows.utils.flex_discounts import (
     select_renewal_flex_discounts,
 )
 from adobe_vipm.flows.utils.parameter import (
+    get_flex_discounts_parameter,
     get_ordering_parameter,
     get_requested_flex_discount_codes,
     set_adobe_order_ids_created_parameter,
@@ -109,6 +110,7 @@ from adobe_vipm.flows.utils.parameter import (
     set_ordering_parameter_error,
     set_renewal_flex_discounts_parameter,
     update_agreement_params_visibility,
+    update_fulfillment_parameter_value,
     update_ordering_parameter_value,
 )
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
@@ -1687,6 +1689,33 @@ def send_gc_mpt_notification(mpt_client, order: dict, items_with_deployment: lis
         "notification",
         context,
     )
+
+
+class DiscardCarriedOverFlexDiscounts(Step):
+    """
+    Drop the flexibleDiscounts value an order inherited from its agreement.
+
+    The parameter is agreement-scoped, so the platform pre-fills a new order
+    with the value the agreement still holds, such as the entries an earlier
+    renewal recorded. The order only writes it when it creates its Adobe order
+    (SubmitNewOrder, SubmitSwitchOrder), which also stores the Adobe order id,
+    so while the order has no Adobe order id any value is carried over: it is
+    cleared before a reader takes it for a code this order redeemed. On a retry
+    after the Adobe order was created the order's own value is kept. Renew now
+    stores no Adobe order id until it completes, so the value is cleared on
+    every attempt and SubmitRenewalNowOrder writes it again from the RENEWAL.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Clear the flexibleDiscounts value the order did not write."""
+        if not context.adobe_new_order_id and get_flex_discounts_parameter(context.order):
+            logger.info(
+                "%s: discarding the flex discounts carried over from the agreement", context
+            )
+            context.order = update_fulfillment_parameter_value(
+                context.order, Param.FLEXIBLE_DISCOUNTS.value, None
+            )
+        next_step(client, context)
 
 
 class NullifyFlexDiscountParam(Step):

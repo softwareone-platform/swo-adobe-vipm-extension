@@ -29,6 +29,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateAssets,
     CreateOrUpdateSubscriptions,
+    DiscardCarriedOverFlexDiscounts,
     GetPreviewOrder,
     GetReturnOrders,
     NullifyFlexDiscountParam,
@@ -245,6 +246,7 @@ def fulfill_change_order(client, order):
     """
     pipeline = Pipeline(
         SetupContext(),
+        DiscardCarriedOverFlexDiscounts(),
         StartOrderProcessing(TEMPLATE_NAME_CHANGE),
         SetupDueDate(),
         ValidateDuplicateLines(),
