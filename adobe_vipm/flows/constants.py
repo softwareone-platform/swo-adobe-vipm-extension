@@ -599,7 +599,7 @@ class ItemTermsModel(StrEnum):
 # Placeholder one-time item used to carry an early renewal ("renew now") that
 # has no quantity/discount changes. It has no counterpart in the Adobe/Airtable
 # SKU catalog, so it must be skipped wherever agreement lines are resolved
-# against Adobe SKUs.
+# against Adobe SKUs. Order lines drop it in split_downsizes_upsizes_new.
 ITEM_EXTERNAL_ID_EARLY_RENEWAL_NO_CHANGE = "adobe-early-renewal-no-change"
 
 

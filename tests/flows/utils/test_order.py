@@ -1,6 +1,6 @@
 import pytest
 
-from adobe_vipm.flows.constants import OrderType
+from adobe_vipm.flows.constants import ITEM_EXTERNAL_ID_EARLY_RENEWAL_NO_CHANGE, OrderType
 from adobe_vipm.flows.utils import (
     get_adobe_order_id,
     is_change_order,
@@ -9,6 +9,7 @@ from adobe_vipm.flows.utils import (
     is_termination_order,
     is_transfer_order,
     set_adobe_order_id,
+    split_downsizes_upsizes_new,
 )
 
 
@@ -105,3 +106,23 @@ def test_is_configuration_order(order_type, expected_result, order_factory):
     result = is_configuration_order(mock_order)
 
     assert result is expected_result
+
+
+def test_split_downsizes_upsizes_new_leaves_out_the_no_change_placeholder(
+    order_factory, lines_factory
+):
+    downsize_line = lines_factory(line_id=1, item_id=1, old_quantity=10, quantity=8)
+    upsize_line = lines_factory(line_id=2, item_id=2, old_quantity=10, quantity=12)
+    new_line = lines_factory(line_id=3, item_id=3, old_quantity=0, quantity=5)
+    placeholder_line = lines_factory(
+        line_id=4,
+        item_id=4,
+        external_vendor_id=ITEM_EXTERNAL_ID_EARLY_RENEWAL_NO_CHANGE,
+        old_quantity=0,
+        quantity=1,
+    )
+    order = order_factory(lines=downsize_line + upsize_line + new_line + placeholder_line)
+
+    result = split_downsizes_upsizes_new(order)
+
+    assert result == (downsize_line, upsize_line, new_line)

@@ -4,7 +4,7 @@ import functools
 from mpt_extension_sdk.mpt_http.mpt import get_product_onetime_items_by_ids
 from mpt_extension_sdk.mpt_http.utils import find_first
 
-from adobe_vipm.flows.constants import OrderType
+from adobe_vipm.flows.constants import ITEM_EXTERNAL_ID_EARLY_RENEWAL_NO_CHANGE, OrderType
 from adobe_vipm.flows.utils.customer import is_new_customer
 from adobe_vipm.utils import get_partial_sku
 
@@ -103,9 +103,25 @@ def is_configuration_order(order: dict) -> bool:
     return order["type"] == OrderType.CONFIGURATION
 
 
+def is_no_change_placeholder_line(line: dict) -> bool:
+    """
+    Checks if the line is the early-renewal no-change placeholder item.
+
+    Args:
+        line: MPT order line.
+
+    Returns:
+        True if the line item is the no-change placeholder, False otherwise.
+    """
+    return line["item"]["externalIds"].get("vendor") == ITEM_EXTERNAL_ID_EARLY_RENEWAL_NO_CHANGE
+
+
 def split_downsizes_upsizes_new(order: dict) -> tuple[list[dict], list[dict], list[dict]]:
     """
     Splits MPT order lines to lines that are dowsizes, upsizes and net new.
+
+    The early-renewal no-change placeholder line is left out: it is not an Adobe
+    product, so no step must resolve it against the SKU catalog.
 
     Args:
         order: The order which lines must be split.
@@ -116,7 +132,8 @@ def split_downsizes_upsizes_new(order: dict) -> tuple[list[dict], list[dict], li
     """
     downsize_lines, upsize_lines, new_lines = [], [], []
 
-    for line in order["lines"]:
+    lines = [line for line in order["lines"] if not is_no_change_placeholder_line(line)]
+    for line in lines:
         if line["quantity"] < line["oldQuantity"]:
             downsize_lines.append(line)
         elif line["oldQuantity"] and line["oldQuantity"] > 0:
