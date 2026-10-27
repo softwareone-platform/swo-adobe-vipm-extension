@@ -2822,13 +2822,14 @@ def test_sync_agreement_empty_customer_id(
     mock_mpt_client,
     mock_adobe_client,
     agreement_factory,
-    mock_notify_agreement_unhandled_exception_in_teams,
+    mock_mpt_update_agreement,
     caplog,
     mock_mpt_get_agreement,
 ):
     agreement = agreement_factory(
         fulfillment_parameters=[{"externalId": "FakeFulfillmentParam"}],
         ordering_parameters=[{"externalId": "FakeOrderingParam"}],
+        external_ids={"vendor": ""},
     )
     mock_notify_agreement_unhandled_exception_in_teams = mocker.patch(
         "adobe_vipm.flows.sync.agreement.notify_agreement_unhandled_exception_in_teams"
@@ -2851,6 +2852,283 @@ def test_sync_agreement_empty_customer_id(
         "AGR-2119-4550-8674-5962", expected_message
     )
     assert expected_message in caplog.messages
+    mock_adobe_client.get_customer.assert_not_called()
+    mock_mpt_update_agreement.assert_not_called()
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_sync_agreement_sets_customer_id_from_vendor_id(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    fulfillment_parameters_factory,
+    adobe_customer_factory,
+    mock_mpt_update_agreement,
+    mock_mpt_get_agreement,
+    dry_run,
+):
+    agreement = agreement_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(customer_id=""),
+        external_ids={"vendor": "vendor-customer-id"},
+    )
+    mock_mpt_get_agreement.return_value = agreement
+    adobe_customer = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = adobe_customer
+    mock_adobe_client.get_subscriptions.return_value = {"items": []}
+    mock_agreement_syncer = mocker.patch(
+        "adobe_vipm.flows.sync.agreement.AgreementSyncer", autospec=True
+    )
+
+    sync_agreement(
+        mock_mpt_client, mock_adobe_client, agreement, dry_run=dry_run, sync_prices=False
+    )  # act
+
+    mock_adobe_client.get_customer.assert_called_once_with("AUT-1234-5678", "vendor-customer-id")
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
+        "AUT-1234-5678", "vendor-customer-id"
+    )
+    mock_agreement_syncer.assert_called_once_with(
+        mock_mpt_client, mock_adobe_client, agreement, adobe_customer, [], dry_run=dry_run
+    )
+    mock_agreement_syncer.return_value.sync.assert_called_once_with(sync_prices=False)
+    if dry_run:
+        mock_mpt_update_agreement.assert_not_called()
+    else:
+        mock_mpt_update_agreement.assert_called_once_with(
+            mock_mpt_client,
+            "AGR-2119-4550-8674-5962",
+            parameters={
+                "fulfillment": fulfillment_parameters_factory(customer_id="vendor-customer-id")
+            },
+        )
+
+
+def test_sync_agreement_sets_customer_id_from_vendor_id_dry_run_log(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    fulfillment_parameters_factory,
+    adobe_customer_factory,
+    mock_mpt_update_agreement,
+    mock_mpt_get_agreement,
+    caplog,
+):
+    agreement = agreement_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(customer_id=""),
+        external_ids={"vendor": "vendor-customer-id"},
+    )
+    mock_mpt_get_agreement.return_value = agreement
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
+    mock_adobe_client.get_subscriptions.return_value = {"items": []}
+    mocker.patch("adobe_vipm.flows.sync.agreement.AgreementSyncer", autospec=True)
+
+    with caplog.at_level(logging.INFO):
+        sync_agreement(
+            mock_mpt_client, mock_adobe_client, agreement, dry_run=True, sync_prices=False
+        )  # act
+
+    expected_parameters = {
+        "fulfillment": fulfillment_parameters_factory(customer_id="vendor-customer-id")
+    }
+    assert caplog.messages == [
+        (
+            "Dry run mode: skipping update agreement AGR-2119-4550-8674-5962 customer id with:\n"
+            f" parameters: {expected_parameters}"
+        )
+    ]
+    mock_mpt_update_agreement.assert_not_called()
+
+
+def test_sync_agreement_vendor_id_invalid_customer(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    fulfillment_parameters_factory,
+    mock_mpt_update_agreement,
+    mock_mpt_terminate_subscription,
+    mock_send_warning,
+    mock_mpt_get_agreement,
+    caplog,
+):
+    agreement = agreement_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(customer_id=""),
+        external_ids={"vendor": "wrong-customer-id"},
+    )
+    mock_mpt_get_agreement.return_value = agreement
+    mock_adobe_client.get_customer.side_effect = AdobeAPIError(
+        status_code=int(AdobeErrorCode.INVALID_CUSTOMER.value),
+        payload={"code": "1116", "message": "Invalid Customer", "additionalDetails": []},
+    )
+    mock_process_lost_customer = mocker.patch(
+        "adobe_vipm.flows.sync.agreement._process_lost_customer", spec=True
+    )
+    mock_notify_agreement_unhandled_exception_in_teams = mocker.patch(
+        "adobe_vipm.flows.sync.agreement.notify_agreement_unhandled_exception_in_teams"
+    )
+    mock_agreement_syncer = mocker.patch(
+        "adobe_vipm.flows.sync.agreement.AgreementSyncer", autospec=True
+    )
+
+    sync_agreement(
+        mock_mpt_client, mock_adobe_client, agreement, dry_run=False, sync_prices=False
+    )  # act
+
+    expected_message = (
+        "CustomerId not found in Agreement AGR-2119-4550-8674-5962 and Adobe rejected "
+        "externalIds.vendor wrong-customer-id. Skipping."
+    )
+    mock_notify_agreement_unhandled_exception_in_teams.assert_called_once_with(
+        "AGR-2119-4550-8674-5962", expected_message
+    )
+    assert caplog.messages == [
+        (
+            "Received Adobe error 1116 - Invalid Customer for customer wrong-customer-id,"
+            " skipping lost customer procedure."
+        ),
+        expected_message,
+    ]
+    mock_process_lost_customer.assert_not_called()
+    mock_send_warning.assert_not_called()
+    mock_mpt_terminate_subscription.assert_not_called()
+    mock_mpt_update_agreement.assert_not_called()
+    mock_agreement_syncer.assert_not_called()
+
+
+def test_sync_agreement_vendor_id_adobe_error(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    fulfillment_parameters_factory,
+    mock_mpt_update_agreement,
+    mock_mpt_get_agreement,
+):
+    agreement = agreement_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(customer_id=""),
+        external_ids={"vendor": "vendor-customer-id"},
+    )
+    mock_mpt_get_agreement.return_value = agreement
+    mock_adobe_client.get_customer.side_effect = AdobeAPIError(
+        status_code=500,
+        payload={"code": "9999", "message": "Unexpected error", "additionalDetails": []},
+    )
+    mock_process_lost_customer = mocker.patch(
+        "adobe_vipm.flows.sync.agreement._process_lost_customer", spec=True
+    )
+
+    with pytest.raises(AdobeAPIError):
+        sync_agreement(
+            mock_mpt_client, mock_adobe_client, agreement, dry_run=False, sync_prices=False
+        )
+
+    mock_process_lost_customer.assert_not_called()
+    mock_mpt_update_agreement.assert_not_called()
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_sync_agreement_sets_vendor_id_from_customer_id(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    mock_mpt_update_agreement,
+    mock_mpt_get_agreement,
+    dry_run,
+):
+    agreement = agreement_factory(external_ids={"vendor": ""})
+    mock_mpt_get_agreement.return_value = agreement
+    adobe_customer = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = adobe_customer
+    mock_adobe_client.get_subscriptions.return_value = {"items": []}
+    mock_agreement_syncer = mocker.patch(
+        "adobe_vipm.flows.sync.agreement.AgreementSyncer", autospec=True
+    )
+
+    sync_agreement(
+        mock_mpt_client, mock_adobe_client, agreement, dry_run=dry_run, sync_prices=False
+    )  # act
+
+    mock_adobe_client.get_customer.assert_called_once_with("AUT-1234-5678", "a-client-id")
+    mock_agreement_syncer.assert_called_once_with(
+        mock_mpt_client, mock_adobe_client, agreement, adobe_customer, [], dry_run=dry_run
+    )
+    if dry_run:
+        mock_mpt_update_agreement.assert_not_called()
+    else:
+        mock_mpt_update_agreement.assert_called_once_with(
+            mock_mpt_client, "AGR-2119-4550-8674-5962", externalIds={"vendor": "a-client-id"}
+        )
+
+
+def test_sync_agreement_matching_customer_and_vendor_ids(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    mock_mpt_update_agreement,
+    mock_mpt_get_agreement,
+):
+    agreement = agreement_factory()
+    mock_mpt_get_agreement.return_value = agreement
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
+    mock_adobe_client.get_subscriptions.return_value = {"items": []}
+    mock_agreement_syncer = mocker.patch(
+        "adobe_vipm.flows.sync.agreement.AgreementSyncer", autospec=True
+    )
+
+    sync_agreement(
+        mock_mpt_client, mock_adobe_client, agreement, dry_run=False, sync_prices=False
+    )  # act
+
+    mock_adobe_client.get_customer.assert_called_once_with("AUT-1234-5678", "a-client-id")
+    mock_agreement_syncer.return_value.sync.assert_called_once_with(sync_prices=False)
+    mock_mpt_update_agreement.assert_not_called()
+
+
+def test_sync_agreement_customer_and_vendor_ids_mismatch(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    mock_mpt_update_agreement,
+    mock_mpt_terminate_subscription,
+    mock_mpt_get_agreement,
+    caplog,
+):
+    agreement = agreement_factory(external_ids={"vendor": "another-client-id"})
+    mock_mpt_get_agreement.return_value = agreement
+    mock_adobe_client.get_customer.side_effect = AdobeAPIError(
+        status_code=int(AdobeErrorCode.INVALID_CUSTOMER.value),
+        payload={"code": "1116", "message": "Invalid Customer", "additionalDetails": []},
+    )
+    mock_process_lost_customer = mocker.patch(
+        "adobe_vipm.flows.sync.agreement._process_lost_customer", spec=True
+    )
+    mock_notify_agreement_unhandled_exception_in_teams = mocker.patch(
+        "adobe_vipm.flows.sync.agreement.notify_agreement_unhandled_exception_in_teams"
+    )
+
+    sync_agreement(
+        mock_mpt_client, mock_adobe_client, agreement, dry_run=False, sync_prices=False
+    )  # act
+
+    expected_message = (
+        "CustomerId a-client-id doesn't match externalIds.vendor another-client-id "
+        "in Agreement AGR-2119-4550-8674-5962. Skipping."
+    )
+    mock_notify_agreement_unhandled_exception_in_teams.assert_called_once_with(
+        "AGR-2119-4550-8674-5962", expected_message
+    )
+    assert caplog.messages == [expected_message]
+    mock_adobe_client.get_customer.assert_not_called()
+    mock_process_lost_customer.assert_not_called()
+    mock_mpt_terminate_subscription.assert_not_called()
+    mock_mpt_update_agreement.assert_not_called()
 
 
 @pytest.mark.usefixtures("mock_get_agreements_by_customer_deployments")

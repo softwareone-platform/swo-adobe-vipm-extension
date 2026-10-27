@@ -1111,6 +1111,7 @@ def agreement_factory(
         ordering_parameters=None,
         lines=None,
         status=AgreementStatus.ACTIVE.value,
+        external_ids=None,
     ):
         if assets is None:
             assets = assets_factory()
@@ -1158,6 +1159,7 @@ def agreement_factory(
         return {
             "id": agreement_id,
             "status": status,
+            "externalIds": external_ids or {"vendor": "a-client-id"},
             "href": "/commerce/agreements/AGR-2119-4550-8674-5962",
             "icon": None,
             "name": "Product Name 1",
