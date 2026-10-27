@@ -1365,22 +1365,12 @@ def sync_agreement(
         logger.error("Product %s not in MPT_PRODUCTS_IDS. Skipping.", agreement["product"]["id"])
         return
 
-    adobe_customer_id = flows_utils.get_adobe_customer_id(agreement)
-    if not adobe_customer_id:
-        message = (
-            f"CustomerId not found in Agreement {agreement['id']} with params "
-            f"{agreement['parameters']}. Skipping."
-        )
-        logger.warning(message)
-        notify_agreement_unhandled_exception_in_teams(agreement["id"], message)
-        return
-
-    adobe_customer = get_customer_or_process_lost_customer(
-        mpt_client, adobe_client, agreement, adobe_customer_id, dry_run=dry_run
+    adobe_customer_id, adobe_customer = _reconcile_and_get_adobe_customer(
+        mpt_client, adobe_client, agreement, dry_run=dry_run
     )
     if not adobe_customer:
-        # The agreement has been processed correctly via the lost customer procedure.
-        # All subscriptions have been terminated, so no further action is needed.
+        # Either the customer id can't be resolved safely and the agreement has been skipped,
+        # or the lost customer procedure has terminated all subscriptions.
         return
 
     authorization_id: str = agreement["authorization"]["id"]
@@ -1393,6 +1383,118 @@ def sync_agreement(
     ).sync(sync_prices=sync_prices)
 
 
+def _reconcile_and_get_adobe_customer(
+    mpt_client: MPTClient,
+    adobe_client: AdobeClient,
+    agreement: dict,
+    *,
+    dry_run: bool,
+) -> tuple[str | None, dict | None]:
+    """
+    Reconciles the customerId parameter with externalIds.vendor and retrieves the Adobe customer.
+
+    The customerId fulfillment parameter is the source of truth. Agreements created by
+    Platform Support with an operations token only have externalIds.vendor set, so it is
+    used to repair customerId once Adobe confirms that the customer exists.
+
+    Args:
+        mpt_client: The MPT client.
+        adobe_client: The Adobe client.
+        agreement: The agreement to sync.
+        dry_run: If True, the reconciliation writes are only logged.
+
+    Returns:
+        The Adobe customer id and the Adobe customer, or (None, None) when the agreement
+        must be skipped or the lost customer procedure has been executed.
+    """
+    customer_id = flows_utils.get_adobe_customer_id(agreement)
+    vendor_id = (agreement.get("externalIds") or {}).get("vendor")
+
+    if not customer_id and not vendor_id:
+        _skip_agreement_sync(
+            agreement,
+            f"CustomerId not found in Agreement {agreement['id']} with params "
+            f"{agreement['parameters']}. Skipping.",
+        )
+        return None, None
+
+    if customer_id and vendor_id and customer_id != vendor_id:
+        _skip_agreement_sync(
+            agreement,
+            f"CustomerId {customer_id} doesn't match externalIds.vendor {vendor_id} "
+            f"in Agreement {agreement['id']}. Skipping.",
+        )
+        return None, None
+
+    if not customer_id:
+        adobe_customer = _restore_customer_id_from_vendor_id(
+            mpt_client, adobe_client, agreement, vendor_id, dry_run=dry_run
+        )
+        return (vendor_id, adobe_customer) if adobe_customer else (None, None)
+
+    if not vendor_id:
+        if dry_run:
+            logger.info(
+                "Dry run mode: skipping update agreement %s with:\n externalIds: %s",
+                agreement["id"],
+                {"vendor": customer_id},
+            )
+        else:
+            mpt.update_agreement(mpt_client, agreement["id"], externalIds={"vendor": customer_id})
+
+    adobe_customer = get_customer_or_process_lost_customer(
+        mpt_client, adobe_client, agreement, customer_id, dry_run=dry_run
+    )
+    return customer_id, adobe_customer
+
+
+def _restore_customer_id_from_vendor_id(
+    mpt_client: MPTClient,
+    adobe_client: AdobeClient,
+    agreement: dict,
+    vendor_id: str,
+    *,
+    dry_run: bool,
+) -> dict | None:
+    # A wrong externalIds.vendor must not terminate a live customer's subscriptions.
+    adobe_customer = get_customer_or_process_lost_customer(
+        mpt_client,
+        adobe_client,
+        agreement,
+        vendor_id,
+        dry_run=dry_run,
+        process_lost_customer=False,
+    )
+    if not adobe_customer:
+        _skip_agreement_sync(
+            agreement,
+            f"CustomerId not found in Agreement {agreement['id']} and Adobe rejected "
+            f"externalIds.vendor {vendor_id}. Skipping.",
+        )
+        return None
+
+    updated_agreement = flows_utils.set_adobe_customer_id(agreement, vendor_id)
+    parameters = {
+        Param.PHASE_FULFILLMENT.value: updated_agreement["parameters"][
+            Param.PHASE_FULFILLMENT.value
+        ]
+    }
+    if dry_run:
+        logger.info(
+            "Dry run mode: skipping update agreement %s customer id with:\n parameters: %s",
+            agreement["id"],
+            parameters,
+        )
+    else:
+        mpt.update_agreement(mpt_client, agreement["id"], parameters=parameters)
+    return adobe_customer
+
+
+def _skip_agreement_sync(agreement: dict, message: str) -> None:
+    logger.warning(message)
+    notify_agreement_unhandled_exception_in_teams(agreement["id"], message)
+
+
 def get_customer_or_process_lost_customer(
     mpt_client: MPTClient,
     adobe_client: AdobeClient,
@@ -1400,6 +1502,7 @@ def get_customer_or_process_lost_customer(
     customer_id: str,
     *,
     dry_run: bool,
+    process_lost_customer: bool = True,
 ) -> dict | None:
     """
     Attempts to retrieve the customer using Adobe Client.
@@ -1411,11 +1514,12 @@ def get_customer_or_process_lost_customer(
             information necessary for fetching customer data.
         customer_id: The unique identifier of the customer to be retrieved.
         dry_run: if True, it just simulates the process
+        process_lost_customer: if False, an invalid customer only returns None and the
+            lost customer procedure is not executed.
 
     Returns:
         dict | None: Returns the customer details as a dictionary if successful. Returns
-        None if the customer is determined to be invalid and the lost customer procedure
-        is initiated.
+        None if the customer is determined to be invalid.
 
     Raises:
         AdobeAPIError: If an error occurs during the customer retrieval process that is
@@ -1425,6 +1529,15 @@ def get_customer_or_process_lost_customer(
         return adobe_client.get_customer(agreement["authorization"]["id"], customer_id)
     except AdobeAPIError as error:
         if error.code == AdobeErrorCode.INVALID_CUSTOMER:
+            if not process_lost_customer:
+                logger.info(
+                    "Received Adobe error %s - %s for customer %s, skipping lost customer "
+                    "procedure.",
+                    error.code,
+                    error.message,
+                    customer_id,
+                )
+                return None
             logger.info(
                 "Received Adobe error %s - %s, assuming lost customer "
                 "and proceeding with lost customer procedure.",
