@@ -779,15 +779,32 @@ def get_order_redeemed_codes(context) -> list[str]:
         for entry in get_flex_discounts_parameter(context.order)
         for code in entry.get("flexDiscountCode") or []
     ]
-    unique_codes = list(dict.fromkeys(applied_codes))
-    if not unique_codes:
+    return drop_already_redeemed_codes(context, list(dict.fromkeys(applied_codes)))
+
+
+def drop_already_redeemed_codes(context, codes: list[str]) -> list[str]:
+    """
+    Leave out the codes the customer already has a redemption row for.
+
+    A code the customer had already redeemed (a reusable discount applied
+    again) is not a fresh once-per-customer redemption, so recording it again
+    would duplicate its row on the redemptions table.
+
+    Args:
+        context: Order processing context (adobe_customer_id).
+        codes: The unique codes the order redeemed, in line order.
+
+    Returns:
+        list[str]: The codes without a redemption row for the customer, in the same order.
+    """
+    if not codes:
         return []
-    redemptions = get_customer_discount_redemptions(context.adobe_customer_id, unique_codes)
+    redemptions = get_customer_discount_redemptions(context.adobe_customer_id, codes)
     already_redeemed = {redemption.code for redemption in redemptions}
     if already_redeemed:
         logger.info(
             "%s: skipping flex discount code(s) the customer had already redeemed: %s",
             context,
-            ", ".join(code for code in unique_codes if code in already_redeemed),
+            ", ".join(code for code in codes if code in already_redeemed),
         )
-    return [code for code in unique_codes if code not in already_redeemed]
+    return [code for code in codes if code not in already_redeemed]
