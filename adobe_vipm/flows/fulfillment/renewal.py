@@ -49,6 +49,7 @@ from adobe_vipm.flows.constants import (
     TEMPLATE_NAME_CHANGE,
     OrderType,
     Param,
+    RenewalPath,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
@@ -71,13 +72,14 @@ from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
     get_coterm_date,
+    get_deployment_id,
     get_order_line_by_sku,
     get_renewal_payload,
     get_subscription_by_line_and_item_id,
     is_3yc_commitment_ending_before_coterm,
     notify_not_updated_subscriptions,
 )
-from adobe_vipm.flows.utils.deployment import get_deployment_id
+from adobe_vipm.flows.utils.flex_discounts import drop_already_redeemed_codes
 from adobe_vipm.flows.utils.parameter import update_fulfillment_parameter_value
 from adobe_vipm.notifications import send_exception
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
@@ -1300,6 +1302,19 @@ def get_redeemed_codes(context):
     return list(dict.fromkeys(redeemed_codes))
 
 
+def get_new_redeemed_codes(context):
+    """
+    Return the codes the plan redeemed that the customer had not redeemed before.
+
+    The wizard sends a reusable code the customer already holds on its line so
+    Adobe applies it to the renewal, but the subscription does not carry it in
+    autoRenewal.flexDiscountCodes, so get_redeemed_codes counts it as redeemed
+    by this order. A code with a redemption row for the customer is left out,
+    as the purchase, change and switch flows do (get_order_redeemed_codes).
+    """
+    return drop_already_redeemed_codes(context, get_redeemed_codes(context))
+
+
 def get_confirmed_codes(context):
     """
     Return the codes Adobe confirmed for the order, or None when nothing was checked.
@@ -1307,15 +1322,19 @@ def get_confirmed_codes(context):
     At the anniversary, ValidateRenewalDiscountCodes stores the codes the
     renewal previews confirmed (context.renewal_confirmed_flex_discount_codes).
     On renew-now, the confirmed set is the codes Adobe applied (result SUCCESS)
-    on the committed RENEWAL order's line items (context.adobe_renewal_order).
-    Either set drops requested codes Adobe did not confirm. A discount object
-    without an explicit SUCCESS result is treated as unconfirmed, so an
-    ambiguous entry never consumes the customer's once-per-customer eligibility.
+    on the committed RENEWAL order's line items (context.adobe_renewal_order);
+    when no RENEWAL order was placed (every renewing line already renewed),
+    no code reached Adobe, so the set is empty. Either set drops requested
+    codes Adobe did not confirm. A discount object without an explicit SUCCESS
+    result is treated as unconfirmed, so an ambiguous entry never consumes the
+    customer's once-per-customer eligibility.
     """
     if context.renewal_confirmed_flex_discount_codes is not None:
         return context.renewal_confirmed_flex_discount_codes
     renewal_order = context.adobe_renewal_order
     if renewal_order is None:
+        if _is_renew_now(context):
+            return set()
         return None
     return {
         flex_discount["code"]
@@ -1323,6 +1342,10 @@ def get_confirmed_codes(context):
         for flex_discount in line_item.get("flexDiscounts") or []
         if flex_discount.get("result") == "SUCCESS"
     }
+
+
+def _is_renew_now(context):
+    return (context.renewal_payload or {}).get("renewalPath") == RenewalPath.NOW
 
 
 def _drop_unconfirmed_codes(context, redeemed_codes, confirmed_codes):
@@ -1440,14 +1463,16 @@ class RecordDiscountRedemptions(Step):
     Runs after the order has been completed, so a fulfillment retry of an
     earlier failure never duplicates rows. One row is written per unique code
     the order redeemed, as reported by the code source the step is built with:
-    by default the renewal plan (get_redeemed_codes), or the completed NEW
+    by default the renewal plan (get_new_redeemed_codes), or the completed NEW
     order's flexibleDiscounts parameter for purchase/change orders
     (flows.utils.flex_discounts.get_order_redeemed_codes).
 
-    On the renewal flows a code the subscription already carried before this
-    order (inherited discount snapshotted by SetupRenewalPlan) was not
-    redeemed by it, so it is skipped: an auto-applied reusable is never
-    recorded as a fresh once-per-customer redemption.
+    On the renewal flows (get_new_redeemed_codes) a code the subscription
+    already carried before this order (inherited discount snapshotted by
+    SetupRenewalPlan) was not redeemed by it, so it is skipped, and so is a
+    code the customer already has a redemption row for: a held reusable the
+    wizard sends again is never recorded as a fresh once-per-customer
+    redemption.
 
     A code is recorded only once Adobe confirmed it, so an unconfirmed code
     never consumes the customer's once-per-customer eligibility. On the
@@ -1464,7 +1489,7 @@ class RecordDiscountRedemptions(Step):
     the order.
     """
 
-    def __init__(self, get_redeemed_codes=get_redeemed_codes):
+    def __init__(self, get_redeemed_codes=get_new_redeemed_codes):
         self._get_redeemed_codes = get_redeemed_codes
 
     def __call__(self, client, context, next_step):
