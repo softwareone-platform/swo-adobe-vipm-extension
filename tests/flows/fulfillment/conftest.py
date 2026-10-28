@@ -38,3 +38,12 @@ def mock_get_customer_id(mocker):
     return mocker.patch(
         "adobe_vipm.flows.fulfillment.reseller_transfer.get_adobe_customer_id", autospec=True
     )
+
+
+@pytest.fixture
+def mock_customer_discount_redemptions(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_customer_discount_redemptions",
+        autospec=True,
+        return_value=[],
+    )
