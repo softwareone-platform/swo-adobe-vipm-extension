@@ -224,13 +224,17 @@ def test_get_existing_discount_codes(mocker, settings):
         return_value=mocked_discount_code_model,
     )
 
-    result = get_existing_discount_codes(["CODE-1", "CODE-2"], "COM")  # act
+    result = get_existing_discount_codes(["CODE-1", "CODE-2"], "COM", "customer-id")  # act
 
     assert result == {"CODE-1"}
     mocked_discount_code_model.all.assert_called_once_with(
         formula=AND(
             EQ(Field("market_segment"), "COM"),
             OR(EQ(Field("Code"), "CODE-1"), EQ(Field("Code"), "CODE-2")),
+            OR(
+                EQ(Field("source"), "API"),
+                EQ(Field("target_customer_id"), "customer-id"),
+            ),
         )
     )
 
@@ -303,6 +307,7 @@ def test_create_client_discount_codes(mocker, settings):
         code="EASTER_26",
         market_segment="COM",
         value=26.0,
+        target_customer_id="adobe-customer-id",
         country="US",
         currency="USD",
     )
@@ -344,7 +349,10 @@ def test_create_client_discount_codes_reusable_intro(mocker, settings):
     assert fields["applicable_order_types"] == ["NEW"]
     # A percentage is country-agnostic: a single row without country nor currency.
     mocked_discount_value_model.assert_called_once_with(
-        code="INTRO_10", market_segment="COM", value=10.0
+        code="INTRO_10",
+        market_segment="COM",
+        value=10.0,
+        target_customer_id="intro-customer-id",
     )
     mocked_discount_value_model.batch_save.assert_called_once()
 
@@ -382,7 +390,12 @@ def test_create_client_discount_codes_skips_incomplete_values(mocker, settings):
 
     # Fixed-type values without a country or without an amount are skipped.
     mocked_discount_value_model.assert_called_once_with(
-        code="FIXED_199", market_segment="COM", value=199.0, country="US", currency="USD"
+        code="FIXED_199",
+        market_segment="COM",
+        value=199.0,
+        target_customer_id="adobe-customer-id",
+        country="US",
+        currency="USD",
     )
 
 
@@ -1395,13 +1408,35 @@ def test_get_discount_values(mocker, discounts_settings):
         return_value=mocked_discount_value_model,
     )
 
-    result = get_discount_values(["CODE-1", "CODE-2"], "COM")  # act
+    result = get_discount_values(["CODE-1", "CODE-2"], "COM", "customer-id")  # act
 
     assert result == rows
     mocked_discount_value_model.all.assert_called_once_with(
         formula=AND(
             EQ(Field("market_segment"), "COM"),
             OR(EQ(Field("code"), "CODE-1"), EQ(Field("code"), "CODE-2")),
+            OR(
+                EQ(Field("target_customer_id"), BLANK()),
+                EQ(Field("target_customer_id"), "customer-id"),
+            ),
+        )
+    )
+
+
+def test_get_discount_values_without_customer(mocker, discounts_settings):
+    mocked_discount_value_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_discount_value_model",
+        return_value=mocked_discount_value_model,
+    )
+
+    get_discount_values(["CODE-1"], "COM", None)  # act
+
+    mocked_discount_value_model.all.assert_called_once_with(
+        formula=AND(
+            EQ(Field("market_segment"), "COM"),
+            OR(EQ(Field("code"), "CODE-1")),
+            EQ(Field("target_customer_id"), BLANK()),
         )
     )
 
@@ -1409,7 +1444,7 @@ def test_get_discount_values(mocker, discounts_settings):
 def test_get_discount_values_without_codes(mocker, discounts_settings):
     mocked_get_model = mocker.patch("adobe_vipm.airtable.models.get_discount_value_model")
 
-    result = get_discount_values([], "COM")  # act
+    result = get_discount_values([], "COM", "customer-id")  # act
 
     assert result == []
     mocked_get_model.assert_not_called()

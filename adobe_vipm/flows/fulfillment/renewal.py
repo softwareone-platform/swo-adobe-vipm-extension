@@ -1378,9 +1378,12 @@ class RecordClientDiscountCodes(Step):
     Write the redeemed discount codes missing from the AirTable store back to it.
 
     A code redeemed by the plan that the Discount Codes table does not know
-    yet was typed by the client in the wizard (never offered from the store),
-    and its use just succeeded on Adobe, so on this first successful use it is
-    fetched from Adobe by code and stored with source "Client". Runs after the
+    yet for the customer (neither as an open code nor as one of the
+    customer's closed codes; another customer's closed row of the same code
+    does not count) was typed by the client in the wizard (never offered from
+    the store), and its use just succeeded on Adobe, so on this first
+    successful use it is fetched from Adobe by code and stored with source
+    "Client" for the customer. Runs after the
     order has been completed and before RecordDiscountRedemptions, so the
     redemption rows always point at a known code. The write is best effort:
     the order is already completed, so a failure is logged and notified for a
@@ -1412,7 +1415,9 @@ class RecordClientDiscountCodes(Step):
 
     def _store_missing_codes(self, context, redeemed_codes):
         market_segment = MARKET_SEGMENTS[context.market_segment]
-        existing_codes = get_existing_discount_codes(redeemed_codes, market_segment)
+        existing_codes = get_existing_discount_codes(
+            redeemed_codes, market_segment, context.adobe_customer_id
+        )
         missing_codes = [code for code in redeemed_codes if code not in existing_codes]
         if not missing_codes:
             logger.info(

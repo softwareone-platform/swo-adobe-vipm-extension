@@ -1055,6 +1055,9 @@ def get_discount_value_model(base_info: AirTableBaseInfo):
 
     The table holds the amounts of the codes on the Discount Codes table: one
     row per country for fixed types, a single country-less row for percentages.
+    A closed code's rows carry the customer the code targets, so each customer
+    holding the same closed code has its own value; an open code's rows leave
+    target_customer_id blank.
 
     Args:
         base_info: The base info instance.
@@ -1069,6 +1072,7 @@ def get_discount_value_model(base_info: AirTableBaseInfo):
         country = fields.TextField("country")
         currency = fields.TextField("currency")
         value = fields.NumberField("value")
+        target_customer_id = fields.TextField("target_customer_id")
 
         class Meta:
             table_name = "Discount Values"
@@ -1079,22 +1083,35 @@ def get_discount_value_model(base_info: AirTableBaseInfo):
     return DiscountValue
 
 
-def get_existing_discount_codes(codes: list[str], market_segment: str) -> set[str]:
+def get_existing_discount_codes(
+    codes: list[str], market_segment: str, customer_id: str
+) -> set[str]:
     """
-    Returns the subset of codes already stored on the Discount Codes table.
+    Returns the subset of codes already stored on the Discount Codes table for the customer.
+
+    A closed code is keyed by (code, market_segment, target_customer_id): Adobe
+    issues the same closed code to many customers, so another customer's closed
+    row of a code does not count. An open row of the code does, whoever the
+    customer, as a closed code cannot take the name of an open code.
 
     Args:
         codes: The discount codes to look up.
         market_segment: Adobe market segment the codes belong to (COM, GOV, EDU).
+        customer_id: Adobe customer id the closed codes must target.
 
     Returns:
-        set[str]: The codes found on the table, whatever their source or state.
+        set[str]: The codes found as open rows or as the customer's closed rows,
+            whatever their state.
     """
     discount_code_model = get_discount_code_model(AirTableBaseInfo.for_discounts())
     rows = discount_code_model.all(
         formula=AND(
             EQ(Field("market_segment"), market_segment),
             OR(*(EQ(Field(DISCOUNT_CODE_FIELD), code) for code in codes)),
+            OR(
+                EQ(Field("source"), DISCOUNT_SOURCE_OPEN),
+                EQ(Field("target_customer_id"), customer_id),
+            ),
         )
     )
     return {row.code for row in rows}
@@ -1131,28 +1148,37 @@ def get_visible_discount_codes(market_segment: str, customer_id: str | None) -> 
     )
 
 
-def get_discount_values(codes: list[str], market_segment: str) -> list:
+def get_discount_values(codes: list[str], market_segment: str, customer_id: str | None) -> list:
     """
-    Returns the Discount Values rows of the given codes.
+    Returns the Discount Values rows of the given codes visible to the customer.
 
     One row per country for fixed types, a single country-less row for
     percentages; the rows are the country support matrix and the amounts
-    used to price a code locally.
+    used to price a code locally. Mirrors the visibility of the codes: the
+    rows of an open code (blank target_customer_id) are visible to any
+    customer of the segment, while the rows of a closed code only to the
+    customer it targets, so another customer's value of the same closed code
+    is left out. Without a customer only the open rows are returned.
 
     Args:
         codes: The discount codes to look up.
         market_segment: Adobe market segment the codes belong to (COM, GOV, EDU).
+        customer_id: Adobe customer id, None when the customer does not exist yet.
 
     Returns:
         list: The DiscountValue rows, empty when no code is given.
     """
     if not codes:
         return []
+    visibility = EQ(Field("target_customer_id"), BLANK())
+    if customer_id:
+        visibility = OR(visibility, EQ(Field("target_customer_id"), customer_id))
     discount_value_model = get_discount_value_model(AirTableBaseInfo.for_discounts())
     return discount_value_model.all(
         formula=AND(
             EQ(Field("market_segment"), market_segment),
             OR(*(EQ(Field("code"), code) for code in codes)),
+            visibility,
         )
     )
 
@@ -1192,7 +1218,8 @@ def create_client_discount_codes(
     enrichment fields stay PENDING for operations to curate, mirroring the
     rows the ef-extension synchronization first creates. The amounts of each
     outcome land on the Discount Values table, one row per country for fixed
-    types and a single country-less row for percentages.
+    types and a single country-less row for percentages, stamped with the
+    customer like the code row.
 
     Args:
         discounts: Adobe flex discount objects, as returned by the flex-discounts API.
@@ -1213,7 +1240,9 @@ def create_client_discount_codes(
     value_rows = [
         discount_value_model(**value_fields)
         for discount in discounts
-        for value_fields in _to_client_discount_value_fields(discount, market_segment)
+        for value_fields in _to_client_discount_value_fields(
+            discount, market_segment, target_customer_id
+        )
     ]
     if value_rows:
         discount_value_model.batch_save(value_rows)
@@ -1265,14 +1294,16 @@ def _get_adobe_discount_type(discount: dict) -> str:
     return ADOBE_DISCOUNT_TYPES.get(adobe_type, adobe_type)
 
 
-def _to_client_discount_value_fields(discount: dict, market_segment: str) -> list[dict]:  # noqa: WPS231
+def _to_client_discount_value_fields(  # noqa: WPS231
+    discount: dict, market_segment: str, target_customer_id: str
+) -> list[dict]:
     """
     Maps the outcomes of an Adobe flex discount to Discount Values rows.
 
     Fixed-type outcomes carry one value per country; percentage outcomes are
     country-agnostic, reported by Adobe as a bare value without country or
     currency. Incomplete values (no amount, or no country on a fixed type)
-    are skipped.
+    are skipped. Every row carries the customer the client code targets.
     """
     code = str(discount.get("code") or "")
     rows = []
@@ -1284,7 +1315,12 @@ def _to_client_discount_value_fields(discount: dict, market_segment: str) -> lis
             country = discount_value.get("country")
             if amount is None or (not is_percentage and not country):
                 continue
-            row = {"code": code, "market_segment": market_segment, "value": amount}
+            row = {
+                "code": code,
+                "market_segment": market_segment,
+                "value": amount,
+                "target_customer_id": target_customer_id,
+            }
             if country:
                 row["country"] = str(country)
             if discount_value.get("currency"):

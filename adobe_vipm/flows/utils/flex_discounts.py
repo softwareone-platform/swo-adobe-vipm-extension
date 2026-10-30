@@ -108,6 +108,7 @@ class FlexDiscountCandidate:
     amount: float | None
     currency: str | None
     net_unit_price: float | None = None
+    record_id: str = ""
 
     @property
     def is_closed(self) -> bool:
@@ -304,14 +305,14 @@ def _read_store(market_segment: str, customer_id: str | None) -> tuple[list, lis
     """Read the codes visible to the customer, their values and the customer's redemptions."""
     discount_codes = get_visible_discount_codes(market_segment, customer_id)
     codes = [row.code for row in discount_codes]
-    discount_values = get_discount_values(codes, market_segment)
+    discount_values = get_discount_values(codes, market_segment, customer_id)
     redemptions = get_customer_discount_redemptions(customer_id, codes)
     logger.info(
         "Flex discounts: %s visible code(s) for segment %s and customer %s: %s",
         len(codes),
         market_segment,
         customer_id or "-",
-        ", ".join(codes),
+        ", ".join(f"{row.code} ({row.id})" for row in discount_codes),
     )
     return discount_codes, discount_values, redemptions
 
@@ -505,6 +506,7 @@ def _to_candidate(row, amount, redeemed_codes: set[str]) -> FlexDiscountCandidat
         held=bool(row.reusable) and row.code in redeemed_codes,
         amount=None if amount is None else amount.value,
         currency=None if amount is None else (amount.currency or None),
+        record_id=row.id,
     )
 
 
