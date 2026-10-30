@@ -934,8 +934,8 @@ def test_create_preview_newlines_wo_deployment(
         adobe_customer_id=customer_id,
         flex_discount_candidates={
             order["lines"][0]["id"]: [
-                SimpleNamespace(code="NE3YC_MPQ_CY"),
-                SimpleNamespace(code="FALLBACK"),
+                SimpleNamespace(code="NE3YC_MPQ_CY", record_id="recNE3YC"),
+                SimpleNamespace(code="FALLBACK", record_id="recFALLBACK"),
             ]
         },
     )

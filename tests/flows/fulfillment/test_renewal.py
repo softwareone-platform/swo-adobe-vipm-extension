@@ -2008,7 +2008,7 @@ def test_record_client_discount_codes_step(
 
     step(mock_mpt_client, renewal_context, mocked_next_step)  # act
 
-    mocked_get_existing_codes.assert_called_once_with(["CODE-1", "CODE-2"], "COM")
+    mocked_get_existing_codes.assert_called_once_with(["CODE-1", "CODE-2"], "COM", "customer-id")
     mock_adobe_client.get_flex_discounts_by_code.assert_called_once_with(
         "authorization-id", "COM", "US", "CODE-2"
     )
