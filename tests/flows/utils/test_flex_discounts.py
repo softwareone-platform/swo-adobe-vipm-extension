@@ -26,6 +26,7 @@ TODAY = dt.date(2026, 9, 10)
 
 def make_code(**overrides):
     fields = {
+        "id": "recOPEN10",
         "code": "OPEN_10",
         "source": "API",
         "category": "STANDARD",
@@ -84,6 +85,7 @@ def test_filter_candidates_returns_candidate_with_percentage_value():
             held=False,
             amount=15,
             currency=None,
+            record_id="recOPEN10",
         )
     ]
     assert result[0].is_closed is False
@@ -461,7 +463,7 @@ def test_get_flex_discount_candidates(mocker):
         "ALI-2": ["ANY"],
     }
     mocked_codes.assert_called_once_with("COM", "P100")
-    mocked_values.assert_called_once_with(["NEW_ONLY", "ANY", "OTHER_SKU"], "COM")
+    mocked_values.assert_called_once_with(["NEW_ONLY", "ANY", "OTHER_SKU"], "COM", "P100")
     mocked_redemptions.assert_called_once_with("P100", ["NEW_ONLY", "ANY", "OTHER_SKU"])
 
 

@@ -237,8 +237,16 @@ class OrderClientMixin:
             for line_id, candidates in context.flex_discount_candidates.items()
             if candidates
         }
-        if codes_by_line:
-            logger.info("Flex discounts: ranked candidates per line: %s", codes_by_line)
+        for candidate_line_id in codes_by_line:
+            logger.info(
+                "Flex discounts: ranked candidates for line %s of order %s: %s",
+                candidate_line_id,
+                context.order_id,
+                ", ".join(
+                    f"{candidate.code} ({candidate.record_id})"
+                    for candidate in context.flex_discount_candidates[candidate_line_id]
+                ),
+            )
         payload = {
             "externalReferenceId": context.order_id,
             "orderType": adobe_constants.ORDER_TYPE_PREVIEW,
