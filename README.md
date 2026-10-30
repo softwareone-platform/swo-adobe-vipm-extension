@@ -8,7 +8,7 @@ The repository contains:
 - Marketplace order validation and fulfillment flows
 - Adobe synchronization and transfer-processing logic
 - operational commands for workers and scheduled jobs
-- Helm deployment charts for API and worker workloads
+- a deployment manifest for the API, worker, and cron workloads
 
 ## Documentation
 
@@ -47,7 +47,8 @@ See [docs/deployment.md](docs/deployment.md) for runtime parameters and the Dock
 - [`tests/`](tests): pytest suite
 - [`make/`](make): modular make targets
 - [`migrations/`](migrations): `mpt-service-cli` migration scripts
-- [`helm/swo-extension-adobe/`](helm/swo-extension-adobe): Helm charts for deployment
+- [`deployment-manifest.yaml`](deployment-manifest.yaml): deployment manifest rendered with the common Helm templates
+- [`helm/swo-extension-adobe/`](helm/swo-extension-adobe): custom Helm templates added to the generated chart
 
 ## Common Commands
 

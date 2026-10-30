@@ -209,7 +209,7 @@ configuration of each.
 
 ## Deployment shape
 
-Deployed from `helm/swo-extension-adobe` as an **api** workload (webhooks and the
+Deployed from `deployment-manifest.yaml` as an **api** workload (webhooks and the
 validation endpoint), a **worker** workload, and **CronJobs** for the management
 commands. The container image is built from the multi-stage `Dockerfile` and
 started via `swoext run`. See [deployment.md](deployment.md) for configuration.
