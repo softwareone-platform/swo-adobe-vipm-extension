@@ -80,6 +80,7 @@ from .parameter import (
 from .subscription import (
     are_all_transferring_items_expired,
     get_adobe_subscription_id,
+    get_offer_id_at_customer_level,
     get_price_item_by_line_sku,
     get_sku_with_discount_level,
     get_subscription_by_line_and_item_id,
@@ -87,6 +88,7 @@ from .subscription import (
     get_transfer_item_sku_by_subscription,
     is_consumables_sku,
     is_line_item_active_subscription,
+    is_same_product,
     is_transferring_item_expired,
 )
 from .three_yc import (
