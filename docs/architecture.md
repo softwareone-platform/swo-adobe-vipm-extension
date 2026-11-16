@@ -46,7 +46,16 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    reads in `flows/utils/renewal_lock.py` that refuse native Change,
    Configuration and Termination orders at validation, because the upgrade
    wizard creates its order directly in Processing and draft validation never
-   runs for it; once Adobe completes a SWITCH, `switch.py` sets the renewal quantity of
+   runs for it; the SWITCH order commits each line with the `offerId` of the
+   `PREVIEW_SWITCH` line with the same `extLineItemNumber` (the customer's
+   discount level), not the payload's Level 1 offer from Adobe's
+   offer-switch-paths, keeping the payload's offer and warning operations only
+   when the preview returns no such line for the same product (partial SKU);
+   each committed offer is logged next to the payload's and the preview's, and
+   operations are warned, without failing the order, when a committed offer is
+   not at the customer's discount level for its offer type (a level Adobe does
+   not return is not compared, and the line is logged as not verified);
+   once Adobe completes a SWITCH, `switch.py` sets the renewal quantity of
    every switched subscription that is still active and set to auto-renew to its
    current quantity (`AlignSwitchRenewalQuantities`, through the Adobe client's
    idempotent-write session, which also retries PATCH; Adobe ignores a renewal

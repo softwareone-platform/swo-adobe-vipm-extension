@@ -15,6 +15,7 @@ from adobe_vipm.flows.utils.customer import (
     get_customer_licenses_discount_level,
 )
 from adobe_vipm.flows.utils.notification import notify_discount_level_error
+from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
 
@@ -219,3 +220,47 @@ def get_template_name_by_subscription(adobe_subscription):
     if adobe_subscription.get("autoRenewal", {}).get("enabled"):
         return TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE
     return TEMPLATE_SUBSCRIPTION_AUTORENEWAL_DISABLE
+
+
+def is_same_product(offer_id: str | None, other_offer_id: str | None) -> bool:
+    """
+    Tell whether two Adobe offerIds are for the same product (same partial SKU).
+
+    Args:
+        offer_id: Adobe offerId, or None.
+        other_offer_id: Adobe offerId to compare with, or None.
+
+    Returns:
+        False when either offerId is missing, otherwise whether their partial SKUs match.
+    """
+    if not offer_id or not other_offer_id:
+        return False
+    return get_partial_sku(offer_id) == get_partial_sku(other_offer_id)
+
+
+def get_offer_id_at_customer_level(offer_id: str, customer: dict | None) -> str | None:
+    """
+    Return offer_id at the customer's discount level for its offer type, or None if unknown.
+
+    Unlike get_sku_with_discount_level, a level Adobe does not return is not
+    defaulted to the base level (MPT-18860), so callers comparing levels never
+    report an unknown level as a difference.
+
+    Args:
+        offer_id: Full Adobe offerId, including its discount level.
+        customer: Adobe customer, or None when it was not retrieved.
+
+    Returns:
+        The offerId with the customer's discount level, or None when the customer,
+        its discounts or level, or the offerId's level position is missing.
+    """
+    if not customer or not customer.get("discounts") or len(offer_id) < 12:
+        return None
+    discount_level = (
+        get_customer_consumables_discount_level(customer)
+        if is_consumables_sku(offer_id)
+        else get_customer_licenses_discount_level(customer)
+    )
+    if not discount_level:
+        return None
+    return f"{offer_id[:10]}{discount_level}{offer_id[12:]}"
