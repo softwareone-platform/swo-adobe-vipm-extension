@@ -41,6 +41,27 @@ from adobe_vipm.flows.helpers import (
     ValidateSkuAvailability,
 )
 
+# A product the preview prices but the order has no line for.
+OTHER_PRODUCT_OFFER_ID = "65322572CA01A12"
+
+
+@pytest.fixture
+def other_product_preview_context(
+    order_factory, adobe_order_factory, adobe_items_factory, adobe_pricing_factory
+):
+    order = order_factory()
+    preview_items = [
+        *adobe_items_factory(pricing=adobe_pricing_factory()),
+        *adobe_items_factory(
+            line_number=2, offer_id=OTHER_PRODUCT_OFFER_ID, pricing=adobe_pricing_factory()
+        ),
+    ]
+    return Context(
+        order=order,
+        order_id=order["id"],
+        adobe_preview_order=adobe_order_factory(order_type=ORDER_TYPE_PREVIEW, items=preview_items),
+    )
+
 
 @freeze_time("2024-01-01")
 def test_setup_context_step(
@@ -797,6 +818,33 @@ def test_update_prices_step_with_multiple_lines(
         ],
     )
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_update_prices_step_skips_preview_line_without_order_line(
+    mock_mpt_client, mock_next_step, mock_update_order, other_product_preview_context
+):
+    context = other_product_preview_context
+    step = UpdatePrices(is_validation=False)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_update_order.assert_called_once_with(
+        mock_mpt_client,
+        context.order_id,
+        lines=[{"id": context.order["lines"][0]["id"], "price": {"unitPP": 849.16}}],
+    )
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_update_prices_step_logs_skipped_preview_line(
+    caplog, mock_mpt_client, mock_next_step, mock_update_order, other_product_preview_context
+):
+    step = UpdatePrices(is_validation=False)
+
+    with caplog.at_level("WARNING"):
+        step(mock_mpt_client, other_product_preview_context, mock_next_step)  # act
+
+    assert f"no order line for preview offer {OTHER_PRODUCT_OFFER_ID}, skipped" in caplog.text
 
 
 def test_validate_3yc_commitment_without_adobe_customer(

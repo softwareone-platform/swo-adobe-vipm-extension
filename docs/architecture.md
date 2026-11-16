@@ -51,6 +51,8 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    discount level), not the payload's Level 1 offer from Adobe's
    offer-switch-paths, keeping the payload's offer and warning operations only
    when the preview returns no such line for the same product (partial SKU);
+   `UpdatePrices` skips and logs a preview line that matches no order line (a
+   line for another product), so the order still reaches the SWITCH submission;
    each committed offer is logged next to the payload's and the preview's, and
    operations are warned, without failing the order, when a committed offer is
    not at the customer's discount level for its offer type (a level Adobe does

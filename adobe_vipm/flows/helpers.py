@@ -617,7 +617,8 @@ class UpdatePrices(Step):
     quantity-weighted blend of both prices, so the line total matches what
     Adobe charges. Such a line is only repriced when both prices are known, so
     a retry never blends an already blended price. Lines without a price from
-    either source keep theirs.
+    either source keep theirs. A preview line that matches no order line (a line
+    for another product) prices nothing and is logged instead of failing the order.
 
     Every order line is logged with its quantity, its previous and new unit
     price and the source of the new one (preview, quantity, flex discount
@@ -702,6 +703,11 @@ class UpdatePrices(Step):
         prices = {}
         for line_item in line_items:
             line = get_order_line_by_sku(context.order, line_item["offerId"])
+            if line is None:
+                logger.warning(
+                    "%s: no order line for preview offer %s, skipped", context, line_item["offerId"]
+                )
+                continue
             price_item = get_price_item_by_line_sku(
                 preview_prices, line["item"]["externalIds"]["vendor"]
             )
