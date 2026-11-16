@@ -4,17 +4,19 @@ This document is the source of truth for runtime configuration referenced by loc
 
 ## Deployment Model
 
-The repository deploys more than one workload shape from [`helm/swo-extension-adobe/`](../helm/swo-extension-adobe):
+The repository describes its workloads in [`deployment-manifest.yaml`](../deployment-manifest.yaml). The Azure DevOps build (`azure-pipelines.yml`) renders it into a Helm chart with the common templates of `ops-mpt-infra` (`helm/helm-init.yaml@ops-mpt-infra`, branch `releases/v1`) and publishes the chart as `helm/swo-extension-adobe`. [`helm/swo-extension-adobe/templates/`](../helm/swo-extension-adobe/templates) holds only templates the common chart cannot express.
 
-- an API workload
-- a worker workload
-- cron-style worker jobs for commands such as `process_transfers`, `check_running_transfers`, `sync_agreements`, `process_3yc`, `check_gc_agreement_deployments`, and `sync_3yc_enrol`
+The chart contains:
+
+- an API workload (Deployment and Service `swo-extension-adobe-web-api`, plus the compatibility Service `swo-extension-adobe-api` still used by the `/extensions-adobe/` route)
+- a worker workload (`swo-extension-adobe-worker`, a single event consumer)
+- cron jobs `swo-extension-adobe-<key>` for the commands `process_transfers`, `check_running_transfers`, `sync_agreements`, `process_3yc`, `check_gc_agreement_deployments`, and `sync_3yc_enrol`
 
 ## Configuration Source
 
 Local Docker Compose reads `.env`.
 
-Deployed workloads receive configuration through Helm config maps, secrets, and mounted JSON files. The deployed templates map the same runtime variables used locally.
+Deployed workloads receive configuration through one config map, one secret, and mounted JSON files, all named `swo-extension-adobe`. Each `env` and `secrets` entry in the manifest maps an App Configuration key `swo-extension-adobe/<logicalKey>` to the runtime variable used locally. The logical key is the variable name in lowerCamelCase (`EXT_NAV_AUTH_CLIENT_ID` -> `extNavAuthClientId`); `APPLICATIONINSIGHTS_CONNECTION_STRING` comes from the shared key `applicationInsightsConnectionString`. Secret values must reach Helm base64-encoded (`base64encode` tag in App Configuration).
 
 ## Core Marketplace Settings
 
@@ -41,6 +43,12 @@ Deployed workloads receive configuration through Helm config maps, secrets, and 
 
 ## Airtable And Tool Storage Settings
 
+`MPT_TOOL_STORAGE_AIRTABLE_API_KEY` and `EXT_AIRTABLE_API_TOKEN` both carry the
+shared Airtable service-account token, through the App Configuration keys
+`mptToolStorageAirtableApiKey` and `extAirtableApiToken` that reference the same
+Key Vault secret. DevOps provisions and rotates that token; a rotation is a
+secret swap only, with no manifest changes.
+
 | Environment Variable | Default | Example | Description |
 | --- | --- | --- | --- |
 | `MPT_TOOL_STORAGE_TYPE` | `local` | `airtable` | `mpt-tool` storage backend |
@@ -52,7 +60,7 @@ Deployed workloads receive configuration through Helm config maps, secrets, and 
 | `EXT_AIRTABLE_PRICING_BASES` | - | `{"PRD-1111-1111":"app..."}` | Per-product Airtable base mapping for pricing data |
 | `EXT_AIRTABLE_SKU_MAPPING_BASE` | - | `appXXXXXXXX` | Airtable base id for SKU mapping |
 | `EXT_AIRTABLE_DISCOUNTS_ID` | - | `appXXXXXXXX` | Airtable base id for the flex discount redemptions recorded by renewal orders |
-| `EXT_MIGRATION_RUNNING_MAX_RETRIES` | `15` | `15` | Retry limit for migration-running logic (code default `15`; the bundled Helm chart ships `10` via `MigrationRunningMaxRetries`) |
+| `EXT_MIGRATION_RUNNING_MAX_RETRIES` | `15` | `15` | Retry limit for migration-running logic (code default `15`; `deployment-manifest.yaml` defaults it to `672`, the value deployed in every environment) |
 
 ## NAV Settings
 
@@ -86,7 +94,7 @@ The runtime reads Adobe authorizations and credentials from the file paths provi
 
 In local Docker Compose runs, these usually point to files in the repository root because the repository is mounted at `/extension`.
 
-In deployed environments, the same paths are expected to exist inside the container through mounted secrets or equivalent file injection.
+In deployed environments, `deployment-manifest.yaml` mounts the secrets `extAdobeCredentialsJson` and `extAdobeAuthorizationsJson` as files under `/extension/adobe_vipm/config` (`secretFiles`) and points both variables there. The cron jobs read the same files, but the common cron job template on `ops-mpt-infra` `releases/v1` does not mount `secretFiles` yet.
 
 ## Adobe JSON File Formats
 
