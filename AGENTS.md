@@ -28,7 +28,7 @@ Then inspect the code paths relevant to the task:
 - [`adobe_vipm/adobe/`](adobe_vipm/adobe) and [`adobe_vipm/airtable/`](adobe_vipm/airtable): integration-specific clients and models
 - [`tests/`](tests/): pytest coverage by domain area
 - [`make/`](make/): canonical local commands
-- [`helm/swo-extension-adobe/`](helm/swo-extension-adobe): deployment manifests for API and worker workloads
+- [`deployment-manifest.yaml`](deployment-manifest.yaml) and [`helm/swo-extension-adobe/`](helm/swo-extension-adobe): deployment manifest for API, worker, and cron workloads, plus custom Helm templates
 
 Operational guidance:
 

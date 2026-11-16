@@ -10,6 +10,10 @@ resources:
       type: git
       name: MPT/ops-build-templates-aks-releases
       ref: releases/v15
+    - repository: ops-mpt-infra
+      type: git
+      name: MPT/ops-mpt-infra
+      ref: releases/v1
 
 variables:
   - name: appName
@@ -54,6 +58,14 @@ stages:
               - name: buildVersion
                 value: $[ stageDependencies.prepare.build_prerequisites.outputs['vars.BUILD_VERSION'] ]
         steps:
+              - checkout: self
+                path: s
+              - template: helm/helm-init.yaml@ops-mpt-infra
+                parameters:
+                  repository: $(appName)
+                  buildNumber: $(buildVersion)
+                  manifest: deployment-manifest.yaml
+                  workingDirectory: helm/$(appName)
               - template: aks-docker-templates/helm-build-steps.yaml@templates
                 parameters:
                   buildNumber: $(buildVersion)
