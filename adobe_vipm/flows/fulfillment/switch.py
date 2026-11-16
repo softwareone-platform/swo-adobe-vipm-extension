@@ -56,7 +56,12 @@ from adobe_vipm.flows.fulfillment.shared import (
 )
 from adobe_vipm.flows.helpers import SetupContext, UpdatePrices, ValidateSkuAvailability
 from adobe_vipm.flows.pipeline import Pipeline, Step
-from adobe_vipm.flows.utils import get_switch_payload, set_adobe_order_id
+from adobe_vipm.flows.utils import (
+    get_offer_id_at_customer_level,
+    get_switch_payload,
+    is_same_product,
+    set_adobe_order_id,
+)
 from adobe_vipm.flows.utils.flex_discounts import get_order_redeemed_codes
 from adobe_vipm.flows.utils.parameter import (
     set_adobe_order_ids_created_parameter,
@@ -172,34 +177,132 @@ def get_unconfirmed_flex_discount_codes(switch_payload, preview_order):
     }
 
 
+def _get_line_number(line_item: dict) -> int | None:
+    """Return the line item's extLineItemNumber, the key that pairs payload and preview lines."""
+    return line_item.get("extLineItemNumber")
+
+
+def _get_preview_offer_ids(preview_order: dict) -> dict[int | None, str]:
+    """Map each PREVIEW_SWITCH line item's extLineItemNumber to the offerId Adobe priced."""
+    return {
+        _get_line_number(line_item): line_item["offerId"]
+        for line_item in preview_order.get("lineItems", [])
+        if line_item.get("offerId")
+    }
+
+
+def get_unmatched_switch_offers(
+    switch_payload: dict, preview_order: dict
+) -> dict[int | None, str | None]:
+    """
+    Return the payload offerIds the PREVIEW_SWITCH order did not price, by line number.
+
+    Such a line has no preview line with its extLineItemNumber for the same
+    product, so build_committed_switch_payload commits it with the payload's
+    Level 1 offerId instead of the customer's discount level.
+    """
+    preview_offer_ids = _get_preview_offer_ids(preview_order)
+    return {
+        _get_line_number(line_item): line_item.get("offerId")
+        for line_item in switch_payload.get("lineItems", [])
+        if not is_same_product(
+            line_item.get("offerId"), preview_offer_ids.get(_get_line_number(line_item))
+        )
+    }
+
+
+def _get_committed_offer_levels(
+    committed_payload: dict, customer: dict | None
+) -> list[tuple[int | None, str, str | None]]:
+    """Return each line's number, committed offerId and offerId at the customer's level, or None."""
+    offer_ids = [
+        (_get_line_number(line_item), line_item.get("offerId") or "")
+        for line_item in committed_payload.get("lineItems", [])
+    ]
+    return [
+        (line_number, offer_id, get_offer_id_at_customer_level(offer_id, customer))
+        for line_number, offer_id in offer_ids
+    ]
+
+
+def get_switch_offer_level_mismatches(
+    committed_payload: dict, customer: dict | None
+) -> dict[int | None, tuple[str, str]]:
+    """
+    Return the committed offerIds whose discount level differs from the customer's, by line.
+
+    Each value is the committed offerId and the offerId at the customer's level.
+    A line whose customer level is unknown is not compared.
+    """
+    return {
+        line_number: (offer_id, expected_offer_id)
+        for line_number, offer_id, expected_offer_id in _get_committed_offer_levels(
+            committed_payload, customer
+        )
+        if expected_offer_id and expected_offer_id != offer_id
+    }
+
+
+def get_unverified_switch_offer_lines(
+    committed_payload: dict, customer: dict | None
+) -> list[int | None]:
+    """
+    Return the line numbers whose committed offer level cannot be checked against the customer's.
+
+    These are the lines get_switch_offer_level_mismatches skips: the customer,
+    its discounts, or its level for the line's offer type is unknown, or the
+    offerId carries no level.
+    """
+    return [
+        line_number
+        for line_number, _, expected_offer_id in _get_committed_offer_levels(
+            committed_payload, customer
+        )
+        if not expected_offer_id
+    ]
+
+
 def build_committed_switch_payload(switch_payload, preview_order):
     """
-    Build the SWITCH order payload, committing only the preview-confirmed discount codes.
+    Build the SWITCH order payload from the switch payload and its PREVIEW_SWITCH order.
 
     The switch payload stays the source of truth for the line items and the
-    cancellingItems; only the flexDiscountCodes of each line item are
-    rewritten. A requested code the preview did not apply (result other than
-    SUCCESS or not reported) is dropped from the line, so the SWITCH order is
-    not rejected for it. A discount the preview reports that the payload did
-    not request (a reusable discount Adobe auto-applied) is not echoed back:
-    Adobe applies it itself and echoing it could put two codes on the line
-    (error 2147).
+    cancellingItems, with two fields taken from the preview:
+
+    - offerId: the payload carries the Level 1 offer of Adobe's
+      offer-switch-paths, while the preview returns the offer at the
+      customer's discount level, as the NEW order flow commits it. The line
+      keeps the payload's offerId when the preview returns no line with the
+      same extLineItemNumber, or one for another product.
+    - flexDiscountCodes: a requested code the preview did not apply (result
+      other than SUCCESS or not reported) is dropped from the line, so the
+      SWITCH order is not rejected for it. A discount the preview reports that
+      the payload did not request (a reusable discount Adobe auto-applied) is
+      not echoed back: Adobe applies it itself and echoing it could put two
+      codes on the line (error 2147).
     """
     confirmed_codes = _get_confirmed_flex_discount_codes(preview_order)
-    line_items = [
-        _build_committed_line_item(
-            line_item, confirmed_codes.get(line_item.get("extLineItemNumber"), set())
+    preview_offer_ids = _get_preview_offer_ids(preview_order)
+    line_items = []
+    for line_item in switch_payload.get("lineItems", []):
+        line_number = _get_line_number(line_item)
+        line_items.append(
+            _build_committed_line_item(
+                line_item,
+                confirmed_codes.get(line_number, set()),
+                preview_offer_ids.get(line_number),
+            )
         )
-        for line_item in switch_payload.get("lineItems", [])
-    ]
     return {**switch_payload, "lineItems": line_items}
 
 
-def _build_committed_line_item(line_item, confirmed_codes):
-    """Keep the line item's requested code only when the preview applied it."""
+def _build_committed_line_item(line_item, confirmed_codes, preview_offer_id):
+    """Take the preview's offerId and keep the requested code only when the preview applied it."""
     committed_line_item = dict(line_item)
     requested_code = next(iter(committed_line_item.pop("flexDiscountCodes", None) or []), None)
     line_number = line_item.get("extLineItemNumber")
+    if is_same_product(line_item.get("offerId"), preview_offer_id):
+        committed_line_item["offerId"] = preview_offer_id
     auto_applied = sorted(confirmed_codes - {requested_code})
     if auto_applied:
         logger.info(
@@ -269,6 +372,7 @@ class GetSwitchPreviewOrder(Step):
 
         logger.info("%s: switch preview validated successfully", context)
         self._notify_unconfirmed_codes(context, switch_payload)
+        self._notify_unmatched_offers(context, switch_payload)
         next_step(mpt_client, context)
 
     def _validate_flex_discount_limit(self, mpt_client, context, switch_payload):
@@ -314,13 +418,40 @@ class GetSwitchPreviewOrder(Step):
             f"- Order ID: {context.order_id}\n",
         )
 
+    def _notify_unmatched_offers(self, context: Context, switch_payload: dict) -> None:
+        """Signal the lines the preview did not price, committed at the payload's offer."""
+        unmatched = get_unmatched_switch_offers(switch_payload, context.adobe_preview_order)
+        if not unmatched:
+            return
+        details = "\n".join(
+            f"- Line {line_number}: {offer_id}"
+            for line_number, offer_id in sorted(unmatched.items())
+        )
+        logger.warning(
+            "%s: Adobe's switch preview did not price line(s) %s for the same product, "
+            "they are committed with the payload offer",
+            context,
+            sorted(unmatched),
+        )
+        customer_id = context.adobe_customer_id or "-"
+        send_warning(
+            f"Switch offer not taken from the preview on order {context.order_id}",
+            "Adobe's switch preview did not return the following lines for the same "
+            "product, so they are committed with the payload offer, which may not carry "
+            "the customer's discount level:\n"
+            f"{details}\n"
+            f"- Customer ID: {customer_id}\n"
+            f"- Order ID: {context.order_id}\n",
+        )
+
 
 class SubmitSwitchOrder(Step):
     """
     Submit the Adobe SWITCH order for the switch payload of the order.
 
-    Only the flexible discount codes confirmed by the PREVIEW_SWITCH order are
-    committed (see build_committed_switch_payload). They are recorded on the
+    Each line is committed with the offerId the PREVIEW_SWITCH order returned
+    (the customer's discount level), and only the flexible discount codes the
+    preview confirmed (see build_committed_switch_payload). They are recorded on the
     flexibleDiscounts parameter as pending proposals while the order is open,
     and reconciled with the codes Adobe applied once it completes.
     Wait for the order to be processed by Adobe before moving to the next step.
@@ -376,9 +507,13 @@ class SubmitSwitchOrder(Step):
 
         Returns None when the submission was rejected and the order failed.
         """
+        switch_payload = get_switch_payload(context.order)
         committed_payload = build_committed_switch_payload(
-            get_switch_payload(context.order), context.adobe_preview_order
+            switch_payload, context.adobe_preview_order
         )
+        self._log_committed_offers(context, switch_payload, committed_payload)
+        self._notify_offer_level_mismatches(context, committed_payload)
+        self._log_unverified_offer_levels(context, committed_payload)
         adobe_order = self._create_switch_order(client, adobe_client, context, committed_payload)
         if adobe_order is None:
             return None
@@ -399,6 +534,65 @@ class SubmitSwitchOrder(Step):
             parameters=context.order["parameters"],
         )
         return adobe_order
+
+    def _log_committed_offers(
+        self, context: Context, switch_payload: dict, committed_payload: dict
+    ) -> None:
+        """Log, per SWITCH line, the offerId committed next to the payload's and the preview's."""
+        payload_offer_ids = {
+            _get_line_number(line_item): line_item.get("offerId")
+            for line_item in switch_payload.get("lineItems", [])
+        }
+        preview_offer_ids = _get_preview_offer_ids(context.adobe_preview_order)
+        for line_item in committed_payload.get("lineItems", []):
+            line_number = _get_line_number(line_item)
+            logger.info(
+                "%s: switch line %s committed with offer %s (payload %s, preview %s)",
+                context,
+                line_number,
+                line_item.get("offerId"),
+                payload_offer_ids.get(line_number),
+                preview_offer_ids.get(line_number),
+            )
+
+    def _notify_offer_level_mismatches(self, context: Context, committed_payload: dict) -> None:
+        """Warn when a committed offer is not at the customer's discount level; never fail."""
+        mismatches = get_switch_offer_level_mismatches(committed_payload, context.adobe_customer)
+        if not mismatches:
+            return
+        line_numbers = sorted(mismatches, key=str)
+        details = "\n".join(
+            "- Line {}: committed {}, customer level {}".format(
+                line_number, *mismatches[line_number]
+            )
+            for line_number in line_numbers
+        )
+        logger.warning(
+            "%s: switch line(s) %s committed at another discount level than the customer's",
+            context,
+            line_numbers,
+        )
+        customer_id = context.adobe_customer_id or "-"
+        send_warning(
+            f"Switch offer not at the customer's discount level on order {context.order_id}",
+            "The SWITCH order commits the following lines at another discount level than "
+            "the customer's, so Adobe may record them at that level:\n"
+            f"{details}\n"
+            f"- Customer ID: {customer_id}\n"
+            f"- Order ID: {context.order_id}\n",
+        )
+
+    def _log_unverified_offer_levels(self, context: Context, committed_payload: dict) -> None:
+        """Log the lines whose offer level could not be checked; no notification, never fail."""
+        unverified = get_unverified_switch_offer_lines(committed_payload, context.adobe_customer)
+        if not unverified:
+            return
+        logger.warning(
+            "%s: switch line(s) %s offer level not verified, the customer's discount level "
+            "for their offer type is unknown",
+            context,
+            sorted(unverified, key=str),
+        )
 
     def _create_switch_order(self, client, adobe_client, context, committed_payload):
         """
