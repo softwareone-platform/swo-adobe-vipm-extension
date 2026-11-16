@@ -7,8 +7,10 @@ from adobe_vipm.adobe.constants import AdobeSubscriptionStatus
 from adobe_vipm.flows.utils import (
     get_customer_consumables_discount_level,
     get_customer_licenses_discount_level,
+    get_offer_id_at_customer_level,
     get_transfer_item_sku_by_subscription,
     is_coterm_date_within_order_creation_window,
+    is_same_product,
     is_transferring_item_expired,
     notify_agreement_unhandled_exception_in_teams,
     notify_discount_level_error,
@@ -357,3 +359,58 @@ def test_notify_discount_level_error(mocker, adobe_customer_factory):
         f"discounts: {customer.get('discounts')}\n\n"
         "defaulting to a default level.",
     )
+
+
+@pytest.mark.parametrize(
+    ("offer_id", "other_offer_id", "expected"),
+    [
+        ("65322651CA01A12", "65322651CA14A12", True),
+        ("65322651CA01A12", "65304578CA01A12", False),
+        (None, "65322651CA14A12", False),
+        ("65322651CA01A12", None, False),
+    ],
+)
+def test_is_same_product(offer_id, other_offer_id, expected):
+    result = is_same_product(offer_id, other_offer_id)
+
+    assert result is expected
+
+
+@pytest.mark.parametrize(
+    ("offer_id", "expected"),
+    [
+        ("65322651CA01A12", "65322651CA14A12"),
+        ("65322651CAT1A12", "65322651CAT3A12"),
+    ],
+)
+def test_get_offer_id_at_customer_level(adobe_customer_factory, offer_id, expected):
+    customer = adobe_customer_factory(licenses_discount_level="14", consumables_discount_level="T3")
+
+    result = get_offer_id_at_customer_level(offer_id, customer)
+
+    assert result == expected
+
+
+def test_get_offer_id_at_customer_level_unknown_level(adobe_customer_factory):
+    customer = adobe_customer_factory(licenses_discount_level="14", consumables_discount_level=None)
+
+    result = get_offer_id_at_customer_level("65322651CAT1A12", customer)
+
+    assert result is None
+
+
+@pytest.mark.parametrize(
+    ("offer_id", "customer"),
+    [
+        ("65322651CA01A12", None),
+        ("6532265", {"discounts": [{"offerType": "LICENSE", "level": "14"}]}),
+        ("65322651CA01A12", {"customerId": "a-client-id"}),
+        ("65322651CA01A12", {"customerId": "a-client-id", "discounts": []}),
+    ],
+)
+def test_get_offer_id_at_customer_level_without_customer_discounts_or_level_position(
+    offer_id, customer
+):
+    result = get_offer_id_at_customer_level(offer_id, customer)
+
+    assert result is None
