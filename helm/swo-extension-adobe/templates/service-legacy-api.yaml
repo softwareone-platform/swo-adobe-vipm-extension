@@ -1,0 +1,25 @@
+{{- /*
+Compatibility alias: the common templates name the API Service <chart>-web-api, but callers
+still use the pre-migration name swo-extension-adobe-api.mp-platform.svc.cluster.local
+(ops-platform-infra helm/mpt-ingress: VirtualService mpt-endpoints, prefix /extensions-adobe/).
+Remove this file once every caller targets swo-extension-adobe-web-api.
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Chart.Name }}-api
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}-api
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: {{ .Chart.Name }}-web-api
+    app.kubernetes.io/instance: {{ .Release.Name }}

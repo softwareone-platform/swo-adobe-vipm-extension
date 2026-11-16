@@ -1,0 +1,173 @@
+# yaml-language-server: $schema=https://nlpapp0335sda.blob.core.windows.net/schema/deployment-manifest.schema.json
+# Rendered into a Helm chart by helm/helm-init.yaml@ops-mpt-infra (see azure-pipelines.yml).
+# Logical keys under env/secrets are the App Configuration keys <component>/<logicalKey>
+# read by mpt-release: lowerCamelCase of the environment variable name the extension reads
+# (EXT_NAV_AUTH_CLIENT_ID -> extNavAuthClientId). APPLICATIONINSIGHTS_CONNECTION_STRING uses
+# the shared/ key instead (a component key would only differ from it by case).
+owner: turing
+api:
+  enabled: true
+  # No swo-extension-adobe-sa service account / workload identity: run as the default SA.
+  serviceAccountName: ""
+  image: swo-extension-adobe
+  command: ["swoext"]
+  args: ["run", "api", "--no-color", "--reload"]
+  # gunicorn binds 0.0.0.0:8080; the extension exposes no /live or /ready endpoint.
+  port: 8080
+  probesEnabled: false
+  hosts:
+    - customer-api.domain.global
+    - extensions-api.domain.global
+  http:
+    - match:
+        - uri:
+            prefix: /swo-extension-adobe-api/
+      rewrite:
+        uri: /
+worker:
+  enabled: true
+  serviceAccountName: ""
+  image: swo-extension-adobe
+  command: ["swoext"]
+  args: ["run", "consumer", "--no-color", "--reload"]
+  # The event consumer listens on no port, so a TCP liveness probe would restart it.
+  probesEnabled: false
+  # Single consumer: keep workers.worker.replicaCount at 1 in App Configuration.
+  replicaCount: 1
+env:
+  otelServiceName:
+    name: OTEL_SERVICE_NAME
+    defaultValue: Swo.Extensions.AdobeVIPM
+  mptApiBaseUrl:
+    name: MPT_API_BASE_URL
+  mptPortalBaseUrl:
+    name: MPT_PORTAL_BASE_URL
+  mptProductsIds:
+    name: MPT_PRODUCTS_IDS
+  mptNotifyCategories:
+    name: MPT_NOTIFY_CATEGORIES
+    defaultValue: '{"ORDERS": "NTC-0000-0006"}'
+  mptToolStorageType:
+    name: MPT_TOOL_STORAGE_TYPE
+    defaultValue: airtable
+  mptToolStorageAirtableBaseId:
+    name: MPT_TOOL_STORAGE_AIRTABLE_BASE_ID
+  mptToolStorageAirtableTableName:
+    name: MPT_TOOL_STORAGE_AIRTABLE_TABLE_NAME
+    defaultValue: Migrations
+  extAdobeApiBaseUrl:
+    name: EXT_ADOBE_API_BASE_URL
+  extAdobeAuthEndpointUrl:
+    name: EXT_ADOBE_AUTH_ENDPOINT_URL
+  extAdobeCredentialsFile:
+    name: EXT_ADOBE_CREDENTIALS_FILE
+    defaultValue: /extension/adobe_vipm/config/adobe_credentials.json
+  extAdobeAuthorizationsFile:
+    name: EXT_ADOBE_AUTHORIZATIONS_FILE
+    defaultValue: /extension/adobe_vipm/config/adobe_authorizations.json
+  extMigrationRunningMaxRetries:
+    name: EXT_MIGRATION_RUNNING_MAX_RETRIES
+    defaultValue: "672"
+  extAirtableBases:
+    name: EXT_AIRTABLE_BASES
+  extAirtablePricingBases:
+    name: EXT_AIRTABLE_PRICING_BASES
+  extAirtableSkuMappingBase:
+    name: EXT_AIRTABLE_SKU_MAPPING_BASE
+  extAirtableDiscountsId:
+    name: EXT_AIRTABLE_DISCOUNTS_ID
+  extNavApiBaseUrl:
+    name: EXT_NAV_API_BASE_URL
+  extNavAuthEndpointUrl:
+    name: EXT_NAV_AUTH_ENDPOINT_URL
+  extNavAuthAudience:
+    name: EXT_NAV_AUTH_AUDIENCE
+  extEmailNotificationsSender:
+    name: EXT_EMAIL_NOTIFICATIONS_SENDER
+  extEmailNotificationsEnabled:
+    name: EXT_EMAIL_NOTIFICATIONS_ENABLED
+    defaultValue: "1"
+  extAwsSesRegion:
+    name: EXT_AWS_SES_REGION
+    defaultValue: eu-west-1
+  extProductSegment:
+    name: EXT_PRODUCT_SEGMENT
+  extGcEmailNotificationsRecipient:
+    name: EXT_GC_EMAIL_NOTIFICATIONS_RECIPIENT
+  extOrderCreationWindowHours:
+    name: EXT_ORDER_CREATION_WINDOW_HOURS
+    defaultValue: "24"
+secrets:
+  applicationInsightsConnectionString:
+    name: APPLICATIONINSIGHTS_CONNECTION_STRING
+  mptApiToken:
+    name: MPT_API_TOKEN
+  mptApiTokenOperations:
+    name: MPT_API_TOKEN_OPERATIONS
+  mptDjangoSecretKey:
+    name: MPT_DJANGO_SECRET_KEY
+  mptToolStorageAirtableApiKey:
+    name: MPT_TOOL_STORAGE_AIRTABLE_API_KEY
+  extAirtableApiToken:
+    name: EXT_AIRTABLE_API_TOKEN
+  extWebhooksSecrets:
+    name: EXT_WEBHOOKS_SECRETS
+  extNavAuthClientId:
+    name: EXT_NAV_AUTH_CLIENT_ID
+  extNavAuthClientSecret:
+    name: EXT_NAV_AUTH_CLIENT_SECRET
+  extMsteamsWebhookUrl:
+    name: EXT_MSTEAMS_WEBHOOK_URL
+  extAwsSesCredentials:
+    name: EXT_AWS_SES_CREDENTIALS
+  # Mounted as files only (secretFiles below), not exported as environment variables.
+  extAdobeCredentialsJson:
+    name: EXT_ADOBE_CREDENTIALS_JSON
+  extAdobeAuthorizationsJson:
+    name: EXT_ADOBE_AUTHORIZATIONS_JSON
+secretFiles:
+  - name: files
+    mountPath: /extension/adobe_vipm/config
+    readOnly: true
+    items:
+      - secret: extAdobeCredentialsJson
+        path: adobe_credentials.json
+      - secret: extAdobeAuthorizationsJson
+        path: adobe_authorizations.json
+cronjobs:
+  proc-trfs:
+    schedule: "0 0,4,8,12,16,20 * * *"
+    serviceAccountName: ""
+    image: swo-extension-adobe
+    command: ["swoext"]
+    args: ["django", "process_transfers"]
+  chk-trfs:
+    schedule: "*/15 * * * *"
+    serviceAccountName: ""
+    image: swo-extension-adobe
+    command: ["swoext"]
+    args: ["django", "check_running_transfers"]
+  agr-sync:
+    schedule: "0 0,4,8,12,16,20 * * *"
+    serviceAccountName: ""
+    image: swo-extension-adobe
+    command: ["swoext"]
+    args: ["django", "sync_agreements"]
+  proc-3yc:
+    schedule: "0 0,4,8,12,16,20 * * *"
+    serviceAccountName: ""
+    image: swo-extension-adobe
+    command: ["swoext"]
+    args: ["django", "process_3yc"]
+  gc-agr:
+    schedule: "*/5 * * * *"
+    serviceAccountName: ""
+    image: swo-extension-adobe
+    command: ["swoext"]
+    args: ["django", "check_gc_agreement_deployments"]
+  sync-3yc-enrol:
+    schedule: "*/5 * * * *"
+    serviceAccountName: ""
+    image: swo-extension-adobe
+    command: ["swoext"]
+    args: ["django", "sync_3yc_enrol"]
