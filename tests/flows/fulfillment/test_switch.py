@@ -38,7 +38,7 @@ from adobe_vipm.flows.fulfillment.switch import (
     get_unverified_switch_offer_lines,
 )
 from adobe_vipm.flows.helpers import SetupContext, UpdatePrices, ValidateSkuAvailability
-from adobe_vipm.flows.pipeline import Cursor
+from adobe_vipm.flows.pipeline import Cursor, Pipeline
 from adobe_vipm.flows.utils import get_adobe_order_id, get_ordering_parameter
 from adobe_vipm.flows.utils.parameter import (
     get_flex_discounts_parameter,
@@ -49,6 +49,10 @@ pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
 SOURCE_SUBSCRIPTION_ID = "2409029d1344028fe34b1a8cc09e8fNA"
 TARGET_SUBSCRIPTION_ID = "target-sub-id"
+# Level 1 offer of Adobe's offer-switch-paths, carried by the switch payload.
+PAYLOAD_OFFER_ID = "65322651CA01A12"
+# The same product at the customer's discount level, returned by PREVIEW_SWITCH.
+CUSTOMER_LEVEL_OFFER_ID = "65322651CA14A12"
 
 
 @pytest.fixture
@@ -75,7 +79,7 @@ def discounted_switch_order(order_factory, order_parameters_factory, discounted_
 
 @pytest.fixture
 def switch_preview_factory(adobe_order_factory, adobe_items_factory):
-    def _preview(flex_discounts=None, offer_id="65322651CA01A12", line_number=1):
+    def _preview(flex_discounts=None, offer_id=PAYLOAD_OFFER_ID, line_number=1):
         items = adobe_items_factory(line_number=line_number, offer_id=offer_id, quantity=25)
         if flex_discounts is not None:
             items[0]["flexDiscounts"] = flex_discounts
@@ -97,49 +101,45 @@ def renewal_in_place(mocker):
 
 
 @pytest.fixture
-def switch_context(switch_order):
-    return Context(
-        order=switch_order,
-        order_id=switch_order["id"],
-        authorization_id="authorization-id",
-        adobe_customer_id="customer-id",
-    )
+def switch_context_factory(switch_order):
+    def factory(
+        *,
+        order: dict | None = None,
+        product_id: str | None = None,
+        adobe_customer: dict | None = None,
+        adobe_preview_order: dict | None = None,
+        adobe_new_order: dict | None = None,
+        adobe_new_order_id: str | None = None,
+    ) -> Context:
+        if adobe_new_order_id is None and adobe_new_order:
+            adobe_new_order_id = adobe_new_order["orderId"]
+        context_order = switch_order if order is None else order
+        return Context(
+            order=context_order,
+            order_id=context_order["id"],
+            product_id=product_id,
+            authorization_id="authorization-id",
+            adobe_customer_id="customer-id",
+            adobe_customer=adobe_customer,
+            adobe_preview_order=adobe_preview_order,
+            adobe_new_order=adobe_new_order,
+            adobe_new_order_id=adobe_new_order_id,
+        )
+
+    return factory
 
 
 @pytest.fixture
-def completed_switch_context(switch_order, adobe_order_factory, adobe_items_factory):
+def completed_switch_context(switch_context_factory, adobe_order_factory, adobe_items_factory):
     adobe_order = adobe_order_factory(
         order_type=ORDER_TYPE_SWITCH,
         order_id="adobe-switch-order-id",
         status=AdobeOrderStatus.COMPLETE.value,
         items=adobe_items_factory(
-            offer_id="65322651CA01A12", quantity=25, subscription_id=TARGET_SUBSCRIPTION_ID
+            offer_id=PAYLOAD_OFFER_ID, quantity=25, subscription_id=TARGET_SUBSCRIPTION_ID
         ),
     )
-    return Context(
-        order=switch_order,
-        order_id=switch_order["id"],
-        product_id="PRD-1111-1111",
-        authorization_id="authorization-id",
-        adobe_customer_id="customer-id",
-        adobe_new_order=adobe_order,
-        adobe_new_order_id="adobe-switch-order-id",
-    )
-
-
-@pytest.fixture
-def submit_switch_context(switch_order, switch_preview_factory, adobe_customer_factory):
-    def _context(preview_offer_id, licenses_discount_level):
-        return Context(
-            order=switch_order,
-            order_id=switch_order["id"],
-            authorization_id="authorization-id",
-            adobe_customer_id="customer-id",
-            adobe_customer=adobe_customer_factory(licenses_discount_level=licenses_discount_level),
-            adobe_preview_order=switch_preview_factory(offer_id=preview_offer_id),
-        )
-
-    return _context
+    return switch_context_factory(product_id="PRD-1111-1111", adobe_new_order=adobe_order)
 
 
 @pytest.fixture
@@ -151,6 +151,34 @@ def submitted_switch(mocker, mock_adobe_client, adobe_order_factory):
     )
     mocker.patch("adobe_vipm.flows.fulfillment.switch.update_order", autospec=True)
     return mocker.patch("adobe_vipm.flows.fulfillment.switch.send_warning", autospec=True)
+
+
+@pytest.fixture
+def customer_level_switch_context(
+    mock_adobe_client,
+    switch_context_factory,
+    order_factory,
+    order_parameters_factory,
+    lines_factory,
+    switch_payload,
+    adobe_order_factory,
+    adobe_items_factory,
+    adobe_pricing_factory,
+):
+    order = order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(switch_payload=switch_payload),
+        lines=lines_factory(
+            external_vendor_id="65322651CA", quantity=25, unit_purchase_price=1000.0
+        ),
+    )
+    preview_items = adobe_items_factory(
+        offer_id=CUSTOMER_LEVEL_OFFER_ID, quantity=25, pricing=adobe_pricing_factory()
+    )
+    mock_adobe_client.create_switch_preview_order.return_value = adobe_order_factory(
+        order_type=ORDER_TYPE_PREVIEW_SWITCH, items=preview_items
+    )
+    return switch_context_factory(order=order)
 
 
 def test_build_committed_switch_payload_keeps_confirmed_code(
@@ -210,22 +238,22 @@ def test_build_committed_switch_payload_without_codes(switch_payload, switch_pre
 def test_build_committed_switch_payload_takes_preview_offer_id(
     switch_payload, switch_preview_factory
 ):
-    preview = switch_preview_factory(offer_id="65322651CA14A12")
+    preview = switch_preview_factory(offer_id=CUSTOMER_LEVEL_OFFER_ID)
 
     result = build_committed_switch_payload(switch_payload, preview)
 
-    assert result["lineItems"][0]["offerId"] == "65322651CA14A12"
-    assert switch_payload["lineItems"][0]["offerId"] == "65322651CA01A12"
+    assert result["lineItems"][0]["offerId"] == CUSTOMER_LEVEL_OFFER_ID
+    assert switch_payload["lineItems"][0]["offerId"] == PAYLOAD_OFFER_ID
 
 
 def test_build_committed_switch_payload_keeps_payload_offer_id_without_preview_line(
     switch_payload, switch_preview_factory
 ):
-    preview = switch_preview_factory(offer_id="65322651CA14A12", line_number=2)
+    preview = switch_preview_factory(offer_id=CUSTOMER_LEVEL_OFFER_ID, line_number=2)
 
     result = build_committed_switch_payload(switch_payload, preview)
 
-    assert result["lineItems"][0]["offerId"] == "65322651CA01A12"
+    assert result["lineItems"][0]["offerId"] == PAYLOAD_OFFER_ID
 
 
 def test_build_committed_switch_payload_keeps_payload_offer_id_for_other_product(
@@ -235,21 +263,21 @@ def test_build_committed_switch_payload_keeps_payload_offer_id_for_other_product
 
     result = build_committed_switch_payload(switch_payload, preview)
 
-    assert result["lineItems"][0]["offerId"] == "65322651CA01A12"
+    assert result["lineItems"][0]["offerId"] == PAYLOAD_OFFER_ID
 
 
 def test_build_committed_switch_payload_takes_preview_offer_id_and_keeps_confirmed_code(
     discounted_switch_payload, switch_preview_factory
 ):
     preview = switch_preview_factory(
-        [{"code": "MT_100_NEW", "result": "SUCCESS"}], offer_id="65322651CA14A12"
+        [{"code": "MT_100_NEW", "result": "SUCCESS"}], offer_id=CUSTOMER_LEVEL_OFFER_ID
     )
 
     result = build_committed_switch_payload(discounted_switch_payload, preview)
 
     assert result["lineItems"][0] == {
         "extLineItemNumber": 1,
-        "offerId": "65322651CA14A12",
+        "offerId": CUSTOMER_LEVEL_OFFER_ID,
         "quantity": 25,
         "flexDiscountCodes": ["MT_100_NEW"],
     }
@@ -268,11 +296,11 @@ def test_get_unmatched_switch_offers(switch_payload, switch_preview_factory):
 
     result = get_unmatched_switch_offers(switch_payload, preview)
 
-    assert result == {1: "65322651CA01A12"}
+    assert result == {1: PAYLOAD_OFFER_ID}
 
 
 def test_get_unmatched_switch_offers_all_matched(switch_payload, switch_preview_factory):
-    preview = switch_preview_factory(offer_id="65322651CA14A12")
+    preview = switch_preview_factory(offer_id=CUSTOMER_LEVEL_OFFER_ID)
 
     result = get_unmatched_switch_offers(switch_payload, preview)
 
@@ -284,7 +312,7 @@ def test_get_switch_offer_level_mismatches(switch_payload, adobe_customer_factor
 
     result = get_switch_offer_level_mismatches(switch_payload, customer)
 
-    assert result == {1: ("65322651CA01A12", "65322651CA14A12")}
+    assert result == {1: (PAYLOAD_OFFER_ID, CUSTOMER_LEVEL_OFFER_ID)}
 
 
 def test_get_switch_offer_level_mismatches_at_customer_level(
@@ -322,17 +350,18 @@ def test_get_unverified_switch_offer_lines_known_level(switch_payload, adobe_cus
 
 
 def test_fail_switch_while_renewal_in_place_continues_without_a_renewal(
-    mocker, mock_mpt_client, switch_context, renewal_in_place
+    mocker, mock_mpt_client, switch_context_factory, renewal_in_place
 ):
+    context = switch_context_factory()
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.switch.switch_order_to_failed"
     )
     mocked_next_step = mocker.MagicMock()
 
-    FailSwitchWhileRenewalInPlace()(mock_mpt_client, switch_context, mocked_next_step)  # act
+    FailSwitchWhileRenewalInPlace()(mock_mpt_client, context, mocked_next_step)  # act
 
     mocked_switch_to_failed.assert_not_called()
-    mocked_next_step.assert_called_once_with(mock_mpt_client, switch_context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 @pytest.mark.parametrize(
@@ -343,8 +372,15 @@ def test_fail_switch_while_renewal_in_place_continues_without_a_renewal(
     ],
 )
 def test_fail_switch_while_renewal_in_place_fails_the_order(  # noqa: WPS211
-    mocker, mock_mpt_client, switch_context, renewal_in_place, early_renewal, staged, error_id
+    mocker,
+    mock_mpt_client,
+    switch_context_factory,
+    renewal_in_place,
+    early_renewal,
+    staged,
+    error_id,
 ):
+    context = switch_context_factory()
     early, staged_check = renewal_in_place
     early.return_value = early_renewal
     staged_check.return_value = staged
@@ -353,7 +389,7 @@ def test_fail_switch_while_renewal_in_place_fails_the_order(  # noqa: WPS211
     )
     mocked_next_step = mocker.MagicMock()
 
-    FailSwitchWhileRenewalInPlace()(mock_mpt_client, switch_context, mocked_next_step)  # act
+    FailSwitchWhileRenewalInPlace()(mock_mpt_client, context, mocked_next_step)  # act
 
     error = mocked_switch_to_failed.mock_calls[0].args[2]
     assert error["id"] == error_id
@@ -361,24 +397,24 @@ def test_fail_switch_while_renewal_in_place_fails_the_order(  # noqa: WPS211
 
 
 def test_fail_switch_while_renewal_in_place_skipped_once_the_switch_exists(
-    mocker, mock_mpt_client, switch_context, renewal_in_place
+    mocker, mock_mpt_client, switch_context_factory, renewal_in_place
 ):
     """A retry after the Adobe SWITCH was submitted has nothing left to protect."""
+    context = switch_context_factory(adobe_new_order_id="adobe-order-id")
     early, staged_check = renewal_in_place
-    switch_context.adobe_new_order_id = "adobe-order-id"
     mocked_next_step = mocker.MagicMock()
 
-    FailSwitchWhileRenewalInPlace()(mock_mpt_client, switch_context, mocked_next_step)  # act
+    FailSwitchWhileRenewalInPlace()(mock_mpt_client, context, mocked_next_step)  # act
 
     early.assert_not_called()
     staged_check.assert_not_called()
-    mocked_next_step.assert_called_once_with(mock_mpt_client, switch_context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_get_switch_preview_order_step(
     mocker, mock_adobe_client, mock_mpt_client, switch_order, switch_payload, switch_preview_factory
 ):
-    preview_order = switch_preview_factory(offer_id="65322651CA14A12")
+    preview_order = switch_preview_factory(offer_id=CUSTOMER_LEVEL_OFFER_ID)
     mock_adobe_client.create_switch_preview_order.return_value = preview_order
     mocked_send_warning = mocker.patch(
         "adobe_vipm.flows.fulfillment.switch.send_warning", autospec=True
@@ -409,7 +445,7 @@ def test_get_switch_preview_order_step_unmatched_offer_warns(
     mocker, mock_adobe_client, mock_mpt_client, switch_order, switch_preview_factory
 ):
     mock_adobe_client.create_switch_preview_order.return_value = switch_preview_factory(
-        offer_id="65322651CA14A12", line_number=2
+        offer_id=CUSTOMER_LEVEL_OFFER_ID, line_number=2
     )
     mocked_send_warning = mocker.patch(
         "adobe_vipm.flows.fulfillment.switch.send_warning", autospec=True
@@ -426,7 +462,7 @@ def test_get_switch_preview_order_step_unmatched_offer_warns(
     step(mock_mpt_client, context, mocked_next_step)  # act
 
     mocked_send_warning.assert_called_once()
-    assert "- Line 1: 65322651CA01A12" in mocked_send_warning.mock_calls[0].args[1]
+    assert f"- Line 1: {PAYLOAD_OFFER_ID}" in mocked_send_warning.mock_calls[0].args[1]
     mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
@@ -976,7 +1012,7 @@ def test_submit_switch_order_step_commits_confirmed_code_pending(
     assert get_flex_discounts_parameter(context.order) == [
         {
             "extLineItemNumber": 1,
-            "offerId": "65322651CA01A12",
+            "offerId": PAYLOAD_OFFER_ID,
             "subscriptionId": None,
             "requestedFlexDiscountCode": "MT_100_NEW",
         }
@@ -1023,7 +1059,7 @@ def test_submit_switch_order_step_commits_preview_offer_id(
     switch_preview_factory,
     adobe_order_factory,
 ):
-    preview = switch_preview_factory(offer_id="65322651CA14A12")
+    preview = switch_preview_factory(offer_id=CUSTOMER_LEVEL_OFFER_ID)
     mock_adobe_client.create_switch_order.return_value = adobe_order_factory(
         order_type=ORDER_TYPE_SWITCH,
         order_id="adobe-switch-order-id",
@@ -1042,47 +1078,101 @@ def test_submit_switch_order_step_commits_preview_offer_id(
     step(mock_mpt_client, context, mocker.create_autospec(Cursor([], None)))  # act
 
     committed_payload = mock_adobe_client.create_switch_order.mock_calls[0].args[3]
-    assert committed_payload["lineItems"][0]["offerId"] == "65322651CA14A12"
+    assert committed_payload["lineItems"][0]["offerId"] == CUSTOMER_LEVEL_OFFER_ID
+
+
+def test_switch_pipeline_prices_line_from_customer_level_preview(
+    mock_mpt_client, mock_update_order, submitted_switch, customer_level_switch_context
+):
+    context = customer_level_switch_context
+    pipeline = Pipeline(
+        GetSwitchPreviewOrder(), UpdatePrices(is_validation=False), SubmitSwitchOrder()
+    )
+
+    pipeline.run(mock_mpt_client, context)  # act
+
+    mock_update_order.assert_called_once_with(
+        mock_mpt_client,
+        context.order_id,
+        lines=[{"id": context.order["lines"][0]["id"], "price": {"unitPP": 849.16}}],
+    )
+
+
+def test_switch_pipeline_commits_customer_level_preview_offer(
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_update_order,
+    submitted_switch,
+    customer_level_switch_context,
+):
+    pipeline = Pipeline(
+        GetSwitchPreviewOrder(), UpdatePrices(is_validation=False), SubmitSwitchOrder()
+    )
+
+    pipeline.run(mock_mpt_client, customer_level_switch_context)  # act
+
+    committed_payload = mock_adobe_client.create_switch_order.mock_calls[0].args[3]
+    assert [line_item["offerId"] for line_item in committed_payload["lineItems"]] == [
+        CUSTOMER_LEVEL_OFFER_ID
+    ]
 
 
 def test_submit_switch_order_step_logs_committed_offer(
-    caplog, mocker, mock_mpt_client, submit_switch_context, submitted_switch
+    caplog,
+    mocker,
+    mock_mpt_client,
+    switch_context_factory,
+    switch_preview_factory,
+    adobe_customer_factory,
+    submitted_switch,
 ):
-    context = submit_switch_context("65322651CA14A12", "14")
+    context = switch_context_factory(
+        adobe_customer=adobe_customer_factory(licenses_discount_level="14"),
+        adobe_preview_order=switch_preview_factory(offer_id=CUSTOMER_LEVEL_OFFER_ID),
+    )
     step = SubmitSwitchOrder()
 
     with caplog.at_level("INFO"):
         step(mock_mpt_client, context, mocker.create_autospec(Cursor([], None)))  # act
 
     assert (
-        "switch line 1 committed with offer 65322651CA14A12 "
-        "(payload 65322651CA01A12, preview 65322651CA14A12)"
+        f"switch line 1 committed with offer {CUSTOMER_LEVEL_OFFER_ID} "
+        f"(payload {PAYLOAD_OFFER_ID}, preview {CUSTOMER_LEVEL_OFFER_ID})"
     ) in caplog.text
     submitted_switch.assert_not_called()
     assert "offer level not verified" not in caplog.text
 
 
 def test_submit_switch_order_step_warns_offer_level_mismatch(
-    mocker, mock_mpt_client, submit_switch_context, submitted_switch
+    mocker,
+    mock_mpt_client,
+    switch_context_factory,
+    switch_preview_factory,
+    adobe_customer_factory,
+    submitted_switch,
 ):
-    context = submit_switch_context("65322651CA01A12", "14")
+    context = switch_context_factory(
+        adobe_customer=adobe_customer_factory(licenses_discount_level="14"),
+        adobe_preview_order=switch_preview_factory(offer_id=PAYLOAD_OFFER_ID),
+    )
     step = SubmitSwitchOrder()
 
     step(mock_mpt_client, context, mocker.create_autospec(Cursor([], None)))  # act
 
     submitted_switch.assert_called_once()
     assert (
-        "- Line 1: committed 65322651CA01A12, customer level 65322651CA14A12"
+        f"- Line 1: committed {PAYLOAD_OFFER_ID}, customer level {CUSTOMER_LEVEL_OFFER_ID}"
         in submitted_switch.mock_calls[0].args[1]
     )
     assert context.adobe_new_order_id == "adobe-switch-order-id"
 
 
 def test_submit_switch_order_step_no_level_warning_without_customer(
-    mocker, mock_mpt_client, submit_switch_context, submitted_switch
+    mocker, mock_mpt_client, switch_context_factory, switch_preview_factory, submitted_switch
 ):
-    context = submit_switch_context("65322651CA01A12", "14")
-    context.adobe_customer = None
+    context = switch_context_factory(
+        adobe_preview_order=switch_preview_factory(offer_id=PAYLOAD_OFFER_ID)
+    )
     step = SubmitSwitchOrder()
 
     step(mock_mpt_client, context, mocker.create_autospec(Cursor([], None)))  # act
@@ -1091,10 +1181,18 @@ def test_submit_switch_order_step_no_level_warning_without_customer(
 
 
 def test_submit_switch_order_step_submits_when_customer_has_no_discounts(
-    caplog, mocker, mock_adobe_client, mock_mpt_client, submit_switch_context, submitted_switch
+    caplog,
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    switch_context_factory,
+    switch_preview_factory,
+    submitted_switch,
 ):
-    context = submit_switch_context("65322651CA01A12", "14")
-    context.adobe_customer = {"customerId": "customer-id"}
+    context = switch_context_factory(
+        adobe_customer={"customerId": "customer-id"},
+        adobe_preview_order=switch_preview_factory(offer_id=PAYLOAD_OFFER_ID),
+    )
     step = SubmitSwitchOrder()
 
     with caplog.at_level("WARNING"):
@@ -1115,7 +1213,7 @@ def test_submit_switch_order_step_records_applied_code_on_completion(
     adobe_items_factory,
 ):
     preview = switch_preview_factory([{"code": "MT_100_NEW", "result": "SUCCESS"}])
-    items = adobe_items_factory(offer_id="65322651CA01A12", quantity=25)
+    items = adobe_items_factory(offer_id=PAYLOAD_OFFER_ID, quantity=25)
     items[0]["flexDiscounts"] = [
         {"code": "MT_100_NEW", "result": "SUCCESS"},
         {"code": "REUSABLE", "result": "SUCCESS"},
@@ -1143,7 +1241,7 @@ def test_submit_switch_order_step_records_applied_code_on_completion(
     assert get_flex_discounts_parameter(context.order) == [
         {
             "extLineItemNumber": 1,
-            "offerId": "65322651CA01A12",
+            "offerId": PAYLOAD_OFFER_ID,
             "subscriptionId": None,
             "flexDiscountCode": ["MT_100_NEW"],
         }
@@ -1160,7 +1258,7 @@ def test_submit_switch_order_step_reconciles_pending_code_on_retry(
     adobe_order_factory,
     adobe_items_factory,
 ):
-    items = adobe_items_factory(offer_id="65322651CA01A12", quantity=25)
+    items = adobe_items_factory(offer_id=PAYLOAD_OFFER_ID, quantity=25)
     items[0]["flexDiscounts"] = [{"code": "MT_100_NEW", "result": "SUCCESS"}]
     mock_adobe_client.get_order.return_value = adobe_order_factory(
         order_type=ORDER_TYPE_SWITCH,
