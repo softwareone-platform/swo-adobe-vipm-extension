@@ -20,6 +20,7 @@ from adobe_vipm.flows.utils import (
     reset_order_error,
     set_order_error,
     split_phone_number,
+    strip_country_prefix_from_state,
 )
 from adobe_vipm.flows.utils.notification import notify_renewal_now_outstanding_steps
 
@@ -414,3 +415,22 @@ def test_get_offer_id_at_customer_level_without_customer_discounts_or_level_posi
     result = get_offer_id_at_customer_level(offer_id, customer)
 
     assert result is None
+
+
+@pytest.mark.parametrize(
+    ("state", "country", "expected"),
+    [
+        ("US-NC", "US", "NC"),
+        ("us-nc", "US", "NC"),
+        ("US-nc", "us", "NC"),
+        ("NC", "US", "NC"),
+        ("North Carolina", "US", "North Carolina"),
+        ("CA-ON", "US", "CA-ON"),
+        ("", "US", ""),
+        (None, "US", None),
+    ],
+)
+def test_strip_country_prefix_from_state(state, country, expected):
+    result = strip_country_prefix_from_state(state, country)
+
+    assert result == expected

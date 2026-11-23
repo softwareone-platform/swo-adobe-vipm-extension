@@ -56,6 +56,7 @@ from adobe_vipm.flows.utils import (
     is_purchase_validation_enabled,
     set_order_error,
     set_ordering_parameter_error,
+    strip_country_prefix_from_state,
     update_ordering_parameter_value,
 )
 from adobe_vipm.flows.utils.market_segment import (
@@ -184,13 +185,15 @@ class ValidateCustomerData(Step):
             )
             return
 
-        if not is_valid_state_or_province(country_code, address["state"]):
+        state = strip_country_prefix_from_state(address.get("state"), country_code)
+        address["state"] = state
+        if not is_valid_state_or_province(country_code, state):
             config = get_config()
             country = config.get_country(country_code)
             state_error = ERR_STATE_OR_PROVINCE
-            if country.provinces_to_code:  # pragma: no branch
+            if state and country.provinces_to_code:
                 suggestions = get_close_matches(
-                    address["state"],
+                    state,
                     list(country.provinces_to_code.keys()),
                 )
                 if suggestions:
@@ -204,7 +207,7 @@ class ValidateCustomerData(Step):
                         address["state"] = suggestions[0]
                 else:
                     errors.append(state_error)
-            else:  # pragma: no cover
+            else:
                 errors.append(state_error)
 
         if not is_valid_postal_code(country_code, address["postCode"]):

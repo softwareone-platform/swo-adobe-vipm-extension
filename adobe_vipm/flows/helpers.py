@@ -64,6 +64,7 @@ from adobe_vipm.flows.utils import (
     set_customer_data,
     set_order_error,
     split_downsizes_upsizes_new,
+    strip_country_prefix_from_state,
 )
 from adobe_vipm.flows.utils.validation import validate_government_lga_data
 from adobe_vipm.notifications import send_exception, send_warning
@@ -97,7 +98,7 @@ class PrepareCustomerData(Step):
             address = licensee["address"]
             new_customer_data[Param.ADDRESS.value] = {
                 "country": address["country"],
-                "state": address["state"],
+                "state": strip_country_prefix_from_state(address.get("state"), address["country"]),
                 "city": address["city"],
                 "addressLine1": address["addressLine1"],
                 "addressLine2": address.get("addressLine2"),

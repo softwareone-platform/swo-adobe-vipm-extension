@@ -50,6 +50,29 @@ def strip_trace_id(traceback: str) -> str:
     return TRACE_ID_REGEX.sub("(<omitted>)", traceback)
 
 
+def strip_country_prefix_from_state(state: str | None, country: str) -> str | None:
+    """
+    Remove the ISO 3166-2 country prefix from a state or province code.
+
+    Marketplace addresses may carry the state as a full ISO 3166-2 subdivision
+    code (for example "US-NC"), while Adobe expects only the subdivision part ("NC").
+
+    Args:
+        state: State or province value taken from a Marketplace address.
+        country: ISO 3166-1 alpha-2 country code of the same address.
+
+    Returns:
+        The state without the leading country prefix, or the unchanged value
+        when it does not start with that prefix.
+    """
+    if not state:
+        return state
+    prefix = f"{country}-"
+    if state.upper().startswith(prefix.upper()):
+        return state[len(prefix) :].upper()
+    return state
+
+
 def get_address(address: dict) -> dict:
     """
     Set the address fields in the address object.

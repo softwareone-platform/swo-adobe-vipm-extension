@@ -311,6 +311,84 @@ def test_prepare_customer_data_step(mock_next_step, mock_mpt_client, mock_order,
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
+def test_prepare_customer_data_step_strips_country_prefix_from_state(
+    mock_next_step,
+    mock_mpt_client,
+    mock_update_order,
+    order_factory,
+    order_parameters_factory,
+):
+    mock_order = order_factory(order_parameters=order_parameters_factory(address={}))
+    mock_order["agreement"]["licensee"]["address"] = {
+        "country": "US",
+        "state": "US-NC",
+        "city": "Raleigh",
+        "addressLine1": "1 E Edenton St",
+        "addressLine2": "",
+        "postCode": "27601",
+    }
+    context = Context(order=mock_order)
+    step = PrepareCustomerData(is_validation=True)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    assert context.customer_data[Param.ADDRESS]["state"] == "NC"
+    mock_update_order.assert_not_called()
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_prepare_customer_data_step_strips_country_prefix_from_state_on_fulfillment(
+    mock_next_step,
+    mock_mpt_client,
+    mock_update_order,
+    order_factory,
+    order_parameters_factory,
+):
+    mock_order = order_factory(order_parameters=order_parameters_factory(address={}))
+    mock_order["agreement"]["licensee"]["address"] = {
+        "country": "US",
+        "state": "US-NC",
+        "city": "Raleigh",
+        "addressLine1": "1 E Edenton St",
+        "addressLine2": "",
+        "postCode": "27601",
+    }
+    context = Context(order=mock_order)
+    step = PrepareCustomerData(is_validation=False)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    updated_parameters = mock_update_order.call_args.kwargs["parameters"]
+    address_param = next(
+        param for param in updated_parameters["ordering"] if param["externalId"] == Param.ADDRESS
+    )
+    assert address_param["value"]["state"] == "NC"
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_prepare_customer_data_step_licensee_address_without_state(
+    mock_next_step,
+    mock_mpt_client,
+    order_factory,
+    order_parameters_factory,
+):
+    mock_order = order_factory(order_parameters=order_parameters_factory(address={}))
+    mock_order["agreement"]["licensee"]["address"] = {
+        "country": "SG",
+        "city": "Singapore",
+        "addressLine1": "1 Raffles Place",
+        "addressLine2": "",
+        "postCode": "048616",
+    }
+    context = Context(order=mock_order)
+    step = PrepareCustomerData(is_validation=True)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    assert context.customer_data[Param.ADDRESS]["state"] is None
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
 def test_prepare_customer_no_data_step(
     mock_next_step,
     mock_mpt_client,
