@@ -135,6 +135,53 @@ def test_validate_address(
     assert "error" not in param
 
 
+def test_validate_address_strips_country_prefix_from_state(order_factory, order_parameters_factory):
+    order = order_factory(
+        order_parameters=order_parameters_factory(
+            address={
+                "country": "US",
+                "state": "US-NC",
+                "city": "Raleigh",
+                "addressLine1": "1 E Edenton St",
+                "addressLine2": "",
+                "postCode": "27601",
+            },
+        )
+    )
+    context = Context(order=order)
+    step = ValidateCustomerData()
+
+    step.validate_address(context)  # act
+
+    assert context.validation_succeeded is True
+    param = get_ordering_parameter(context.order, Param.ADDRESS.value)
+    assert "error" not in param
+    assert param["value"]["state"] == "NC"
+
+
+def test_validate_address_missing_state(order_factory, order_parameters_factory):
+    order = order_factory(
+        order_parameters=order_parameters_factory(
+            address={
+                "country": "US",
+                "state": None,
+                "city": "San Jose",
+                "addressLine1": "3601 Lyon St",
+                "addressLine2": "",
+                "postCode": "94123",
+            },
+        )
+    )
+    context = Context(order=order)
+    step = ValidateCustomerData()
+
+    step.validate_address(context)  # act
+
+    assert context.validation_succeeded is False
+    param = get_ordering_parameter(context.order, Param.ADDRESS.value)
+    assert param["error"] == ERR_ADDRESS.to_dict(title=param["name"], errors=ERR_STATE_OR_PROVINCE)
+
+
 def test_validate_address_invalid_country(order_factory, order_parameters_factory):
     order = order_factory(
         order_parameters=order_parameters_factory(

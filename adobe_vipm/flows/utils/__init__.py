@@ -28,6 +28,7 @@ from .formatting import (
     get_contact,
     md2html,
     split_phone_number,
+    strip_country_prefix_from_state,
     strip_trace_id,
 )
 from .market_segment import (
