@@ -20,6 +20,20 @@ class AdobeOrderStatus(StrEnum):
     FAILED_INVALID_CUSTOMER_ID = "1026"
 
 
+class AdobeCustomerStatus(StrEnum):
+    """Adobe customer account statuses.
+
+    The codes overlap with `AdobeOrderStatus` but have different meanings: 1022 is a
+    compliance block on a customer account and an inactive reseller on an order.
+    """
+
+    ACTIVE = "1000"
+    PENDING = "1002"
+    INACTIVE = "1004"
+    COMPLIANCE_BLOCK = "1022"
+    SCREENING = "1023"
+
+
 class AdobeSubscriptionStatus(StrEnum):
     """Adobe subscription statuses."""
 
