@@ -1,7 +1,9 @@
+import json
 import logging
 from urllib.parse import urljoin
 
 import pytest
+import requests
 
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
@@ -76,6 +78,45 @@ def adobe_http_client(mocker, adobe_client_factory):
             return_value=adobe_client,
         )
     return adobe_client
+
+
+@pytest.fixture
+def processing_template_url_factory():
+    def factory(template_name):
+        rql_filter = (
+            f"and(eq(type,'OrderProcessing'),or(eq(default,'true'),eq(name,'{template_name}')))"
+        )
+        return (
+            "https://localhost/public/v1/catalog/products/PRD-1111-1111/templates"
+            f"?{rql_filter}&order=default&limit=1"
+        )
+
+    return factory
+
+
+@pytest.fixture
+def processing_template_response_factory(requests_mocker, processing_template_url_factory):
+    def factory(template_name, templates):
+        def match_template_name(request):
+            return f"eq(name,'{template_name}')" in request.url, "template name does not match"
+
+        return requests_mocker.get(
+            processing_template_url_factory(template_name),
+            json={"data": templates},
+            match=[match_template_name],
+        )
+
+    return factory
+
+
+@pytest.fixture
+def screening_template():
+    return {"id": "TPL-9999", "name": TEMPLATE_NAME_SCREENING}
+
+
+@pytest.fixture
+def purchase_template():
+    return {"id": "TPL-1234", "name": TEMPLATE_NAME_PURCHASE}
 
 
 @pytest.fixture
@@ -600,20 +641,396 @@ def test_create_customer_step_handle_error_invalid_fields(
     [AdobeCustomerStatus.ACTIVE, AdobeCustomerStatus.INACTIVE],
 )
 def test_check_account_status_step_continues(
-    status, mock_adobe_client, mock_mpt_client, mock_next_step, mock_order, adobe_customer_factory
+    status,
+    requests_mocker,
+    mock_adobe_client,
+    mpt_client,
+    mock_next_step,
+    order_factory,
+    adobe_customer_factory,
+    processing_template_url_factory,
+    processing_template_response_factory,
+    screening_template,
+    purchase_template,
 ):
+    processing_template_response_factory(TEMPLATE_NAME_SCREENING, [screening_template])
+    order = order_factory(template=purchase_template)
     context = Context(
-        order=mock_order,
+        order=order,
+        order_id=order["id"],
         adobe_customer_id="a-client-id",
         adobe_customer={**adobe_customer_factory(), "status": status.value},
     )
     step = CheckAccountStatus()
 
-    step(mock_mpt_client, context, mock_next_step)  # act
+    step(mpt_client, context, mock_next_step)  # act
 
-    mock_next_step.assert_called_once_with(mock_mpt_client, context)
-    assert mock_mpt_client.mock_calls == []
+    mock_next_step.assert_called_once_with(mpt_client, context)
+    assert context.order == order
+    assert [(call.request.method, call.request.url) for call in requests_mocker.calls] == [
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_SCREENING)),
+    ]
     assert mock_adobe_client.mock_calls == []
+
+
+@pytest.mark.parametrize("product_templates", [[{"id": "TPL-0000", "name": "Default"}], []])
+def test_check_account_status_step_continues_when_screening_template_missing(
+    product_templates,
+    requests_mocker,
+    mpt_client,
+    mock_next_step,
+    order_factory,
+    adobe_customer_factory,
+    processing_template_url_factory,
+    processing_template_response_factory,
+):
+    processing_template_response_factory(TEMPLATE_NAME_SCREENING, product_templates)
+    order = order_factory(template={"id": "TPL-0000", "name": "Default"})
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id="a-client-id",
+        adobe_customer={**adobe_customer_factory(), "status": AdobeCustomerStatus.ACTIVE.value},
+    )
+    step = CheckAccountStatus()
+
+    step(mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_called_once_with(mpt_client, context)
+    assert context.order == order
+    assert [(call.request.method, call.request.url) for call in requests_mocker.calls] == [
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_SCREENING)),
+    ]
+
+
+def test_check_account_status_step_restores_purchase_template(
+    requests_mocker,
+    mpt_client,
+    mock_next_step,
+    order_factory,
+    adobe_customer_factory,
+    processing_template_url_factory,
+    processing_template_response_factory,
+    screening_template,
+    purchase_template,
+):
+    processing_template_response_factory(TEMPLATE_NAME_SCREENING, [screening_template])
+    processing_template_response_factory(TEMPLATE_NAME_PURCHASE, [purchase_template])
+    order = order_factory(template={"id": screening_template["id"]})
+    order_url = f"https://localhost/public/v1/commerce/orders/{order['id']}"
+    mocked_update_order = requests_mocker.put(order_url, json={})
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id="a-client-id",
+        adobe_customer={**adobe_customer_factory(), "status": AdobeCustomerStatus.ACTIVE.value},
+    )
+    step = CheckAccountStatus()
+
+    step(mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_called_once_with(mpt_client, context)
+    assert context.order["template"] == purchase_template
+    assert [(call.request.method, call.request.url) for call in requests_mocker.calls] == [
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_SCREENING)),
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_PURCHASE)),
+        ("PUT", order_url),
+    ]
+    assert json.loads(mocked_update_order.calls[0].request.body) == {"template": purchase_template}
+
+
+@pytest.mark.parametrize(
+    "lookup_error_response",
+    [
+        pytest.param(
+            {"status": 500, "json": {"status": 500, "title": "Internal Server Error"}},
+            id="http_500",
+        ),
+        pytest.param({"body": requests.ConnectionError("connection reset")}, id="connection_error"),
+    ],
+)
+def test_check_account_status_step_continues_when_template_lookup_fails(
+    lookup_error_response,
+    caplog,
+    requests_mocker,
+    mpt_client,
+    mock_next_step,
+    order_factory,
+    adobe_customer_factory,
+    processing_template_url_factory,
+    screening_template,
+):
+    requests_mocker.get(
+        processing_template_url_factory(TEMPLATE_NAME_SCREENING), **lookup_error_response
+    )
+    order = order_factory(template=screening_template)
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id="a-client-id",
+        adobe_customer={**adobe_customer_factory(), "status": AdobeCustomerStatus.ACTIVE.value},
+    )
+    step = CheckAccountStatus()
+
+    step(mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_called_once_with(mpt_client, context)
+    assert context.order == order
+    assert "failed to restore the Purchase template" in caplog.text
+
+
+def test_check_account_status_step_continues_when_template_update_fails(
+    caplog,
+    requests_mocker,
+    mpt_client,
+    mock_next_step,
+    order_factory,
+    adobe_customer_factory,
+    processing_template_response_factory,
+    screening_template,
+    purchase_template,
+):
+    processing_template_response_factory(TEMPLATE_NAME_SCREENING, [screening_template])
+    processing_template_response_factory(TEMPLATE_NAME_PURCHASE, [purchase_template])
+    order = order_factory(template=screening_template)
+    requests_mocker.put(
+        f"https://localhost/public/v1/commerce/orders/{order['id']}",
+        status=500,
+        json={"status": 500, "title": "Internal Server Error"},
+    )
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id="a-client-id",
+        adobe_customer={**adobe_customer_factory(), "status": AdobeCustomerStatus.ACTIVE.value},
+    )
+    step = CheckAccountStatus()
+
+    step(mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_called_once_with(mpt_client, context)
+    assert context.order["template"] == screening_template
+    assert "failed to restore the Purchase template" in caplog.text
+
+
+def test_check_account_status_step_restores_default_template_when_purchase_template_missing(
+    caplog,
+    requests_mocker,
+    mpt_client,
+    mock_next_step,
+    order_factory,
+    adobe_customer_factory,
+    processing_template_url_factory,
+    processing_template_response_factory,
+    screening_template,
+):
+    default_template = {"id": "TPL-0000", "name": "Default"}
+    processing_template_response_factory(TEMPLATE_NAME_SCREENING, [screening_template])
+    processing_template_response_factory(TEMPLATE_NAME_PURCHASE, [default_template])
+    order = order_factory(template=screening_template)
+    order_url = f"https://localhost/public/v1/commerce/orders/{order['id']}"
+    mocked_update_order = requests_mocker.put(order_url, json={})
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id="a-client-id",
+        adobe_customer={**adobe_customer_factory(), "status": AdobeCustomerStatus.ACTIVE.value},
+    )
+    step = CheckAccountStatus()
+
+    with caplog.at_level("WARNING"):
+        step(mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_called_once_with(mpt_client, context)
+    assert context.order["template"] == default_template
+    assert json.loads(mocked_update_order.calls[0].request.body) == {"template": default_template}
+    assert "template Purchase not found for product PRD-1111-1111" in caplog.text
+
+
+def test_check_account_status_step_keeps_template_when_no_processing_template(
+    caplog,
+    requests_mocker,
+    mpt_client,
+    mock_next_step,
+    order_factory,
+    adobe_customer_factory,
+    processing_template_url_factory,
+    processing_template_response_factory,
+    screening_template,
+):
+    processing_template_response_factory(TEMPLATE_NAME_SCREENING, [screening_template])
+    processing_template_response_factory(TEMPLATE_NAME_PURCHASE, [])
+    order = order_factory(template=screening_template)
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id="a-client-id",
+        adobe_customer={**adobe_customer_factory(), "status": AdobeCustomerStatus.ACTIVE.value},
+    )
+    step = CheckAccountStatus()
+
+    with caplog.at_level("WARNING"):
+        step(mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_called_once_with(mpt_client, context)
+    assert context.order == order
+    assert [(call.request.method, call.request.url) for call in requests_mocker.calls] == [
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_SCREENING)),
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_PURCHASE)),
+    ]
+    assert "no processing template found for product PRD-1111-1111" in caplog.text
+
+
+@pytest.mark.parametrize("order_template", [{"id": "TPL-1234"}, None])
+def test_check_account_status_step_screening_sets_template(
+    order_template,
+    requests_mocker,
+    mock_adobe_client,
+    mpt_client,
+    mock_next_step,
+    order_factory,
+    adobe_customer_factory,
+    processing_template_url_factory,
+    processing_template_response_factory,
+    screening_template,
+):
+    processing_template_response_factory(TEMPLATE_NAME_SCREENING, [screening_template])
+    order = order_factory(template=order_template)
+    order_url = f"https://localhost/public/v1/commerce/orders/{order['id']}"
+    mocked_update_order = requests_mocker.put(order_url, json={})
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id="a-client-id",
+        adobe_customer={
+            **adobe_customer_factory(),
+            "status": AdobeCustomerStatus.SCREENING.value,
+        },
+    )
+    step = CheckAccountStatus()
+
+    step(mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_not_called()
+    assert context.order["template"] == screening_template
+    assert [(call.request.method, call.request.url) for call in requests_mocker.calls] == [
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_SCREENING)),
+        ("PUT", order_url),
+    ]
+    assert json.loads(mocked_update_order.calls[0].request.body) == {"template": screening_template}
+    assert mock_adobe_client.mock_calls == []
+
+
+def test_check_account_status_step_screening_template_already_set(
+    requests_mocker,
+    mpt_client,
+    mock_next_step,
+    order_factory,
+    adobe_customer_factory,
+    processing_template_url_factory,
+    processing_template_response_factory,
+    screening_template,
+):
+    processing_template_response_factory(TEMPLATE_NAME_SCREENING, [screening_template])
+    order = order_factory(template={"id": screening_template["id"]})
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id="a-client-id",
+        adobe_customer={
+            **adobe_customer_factory(),
+            "status": AdobeCustomerStatus.SCREENING.value,
+        },
+    )
+    step = CheckAccountStatus()
+
+    step(mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_not_called()
+    assert context.order == order
+    assert [(call.request.method, call.request.url) for call in requests_mocker.calls] == [
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_SCREENING)),
+    ]
+
+
+@pytest.mark.parametrize("product_templates", [[{"id": "TPL-0000", "name": "Default"}], []])
+def test_check_account_status_step_screening_template_missing(
+    product_templates,
+    caplog,
+    requests_mocker,
+    mpt_client,
+    mock_next_step,
+    order_factory,
+    adobe_customer_factory,
+    processing_template_url_factory,
+    processing_template_response_factory,
+    purchase_template,
+):
+    processing_template_response_factory(TEMPLATE_NAME_SCREENING, product_templates)
+    order = order_factory(template=purchase_template)
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id="a-client-id",
+        adobe_customer={
+            **adobe_customer_factory(),
+            "status": AdobeCustomerStatus.SCREENING.value,
+        },
+    )
+    step = CheckAccountStatus()
+
+    with caplog.at_level("WARNING"):
+        step(mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_not_called()
+    assert context.order == order
+    assert [(call.request.method, call.request.url) for call in requests_mocker.calls] == [
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_SCREENING)),
+    ]
+    assert "template Screening not found for product PRD-1111-1111" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "lookup_error_response",
+    [
+        pytest.param(
+            {"status": 500, "json": {"status": 500, "title": "Internal Server Error"}},
+            id="http_500",
+        ),
+        pytest.param({"body": requests.ConnectionError("connection reset")}, id="connection_error"),
+    ],
+)
+def test_check_account_status_step_screening_waits_when_template_lookup_fails(
+    lookup_error_response,
+    caplog,
+    requests_mocker,
+    mpt_client,
+    mock_next_step,
+    order_factory,
+    adobe_customer_factory,
+    processing_template_url_factory,
+    purchase_template,
+):
+    requests_mocker.get(
+        processing_template_url_factory(TEMPLATE_NAME_SCREENING), **lookup_error_response
+    )
+    order = order_factory(template=purchase_template)
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id="a-client-id",
+        adobe_customer={
+            **adobe_customer_factory(),
+            "status": AdobeCustomerStatus.SCREENING.value,
+        },
+    )
+    step = CheckAccountStatus()
+
+    step(mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_not_called()
+    assert context.order == order
+    assert "failed to set the Screening template" in caplog.text
 
 
 def test_check_account_status_step_pending(
@@ -801,7 +1218,11 @@ def test_purchase_pipeline_later_run_account_active(
     adobe_customer_factory,
     adobe_order_factory,
     mock_get_adobe_product_by_marketplace_sku,
+    processing_template_url_factory,
+    processing_template_response_factory,
+    screening_template,
 ):
+    processing_template_response_factory(TEMPLATE_NAME_SCREENING, [screening_template])
     adobe_orders_url = urljoin(
         settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/customers/a-client-id/orders"
     )
@@ -833,10 +1254,159 @@ def test_purchase_pipeline_later_run_account_active(
     pipeline.run(mpt_client, purchase_context)  # act
 
     assert [(call.request.method, call.request.url) for call in requests_mocker.calls] == [
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_SCREENING)),
         ("POST", f"{adobe_orders_url}?fetch-price=true"),
         ("POST", adobe_orders_url),
         ("PUT", f"https://localhost/public/v1/commerce/orders/{purchase_context.order_id}"),
     ]
+
+
+def test_purchase_pipeline_first_run_account_screening(
+    requests_mocker,
+    settings,
+    mpt_client,
+    purchase_context,
+    adobe_http_client,
+    adobe_customer_factory,
+    processing_template_url_factory,
+    processing_template_response_factory,
+    screening_template,
+    purchase_template,
+):
+    adobe_customers_url = urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/customers")
+    requests_mocker.post(
+        adobe_customers_url,
+        status=201,
+        json={**adobe_customer_factory(), "status": AdobeCustomerStatus.SCREENING.value},
+    )
+    processing_template_response_factory(TEMPLATE_NAME_PURCHASE, [purchase_template])
+    processing_template_response_factory(TEMPLATE_NAME_SCREENING, [screening_template])
+    order_url = f"https://localhost/public/v1/commerce/orders/{purchase_context.order_id}"
+    agreement_url = (
+        f"https://localhost/public/v1/commerce/agreements/{purchase_context.agreement_id}"
+    )
+    mocked_update_order = requests_mocker.put(order_url, json={})
+    requests_mocker.put(agreement_url, json={})
+    purchase_context.order["template"] = purchase_template
+    pipeline = Pipeline(
+        StartOrderProcessing(TEMPLATE_NAME_PURCHASE, template_to_keep=TEMPLATE_NAME_SCREENING),
+        CreateCustomer(),
+        CheckAccountStatus(),
+        GetPreviewOrder(),
+        SubmitNewOrder(),
+    )
+
+    pipeline.run(mpt_client, purchase_context)  # act
+
+    assert get_adobe_customer_id(purchase_context.order) == "a-client-id"
+    assert purchase_context.order["template"] == screening_template
+    assert [(call.request.method, call.request.url) for call in requests_mocker.calls] == [
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_PURCHASE)),
+        ("POST", adobe_customers_url),
+        ("PUT", order_url),
+        ("PUT", agreement_url),
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_SCREENING)),
+        ("PUT", order_url),
+    ]
+    assert json.loads(mocked_update_order.calls[1].request.body) == {"template": screening_template}
+
+
+def test_purchase_pipeline_later_run_account_screening(
+    requests_mocker,
+    mpt_client,
+    purchase_context,
+    adobe_http_client,
+    adobe_customer_factory,
+    processing_template_url_factory,
+    processing_template_response_factory,
+    screening_template,
+    purchase_template,
+):
+    processing_template_response_factory(TEMPLATE_NAME_PURCHASE, [purchase_template])
+    processing_template_response_factory(TEMPLATE_NAME_SCREENING, [screening_template])
+    purchase_context.order["template"] = screening_template
+    purchase_context.adobe_customer_id = "a-client-id"
+    purchase_context.adobe_customer = {
+        **adobe_customer_factory(),
+        "status": AdobeCustomerStatus.SCREENING.value,
+    }
+    pipeline = Pipeline(
+        StartOrderProcessing(TEMPLATE_NAME_PURCHASE, template_to_keep=TEMPLATE_NAME_SCREENING),
+        CreateCustomer(),
+        CheckAccountStatus(),
+        GetPreviewOrder(),
+        SubmitNewOrder(),
+    )
+
+    pipeline.run(mpt_client, purchase_context)  # act
+
+    assert purchase_context.order["template"] == screening_template
+    assert [(call.request.method, call.request.url) for call in requests_mocker.calls] == [
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_PURCHASE)),
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_SCREENING)),
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_SCREENING)),
+    ]
+
+
+def test_purchase_pipeline_account_active_after_screening(
+    requests_mocker,
+    settings,
+    mpt_client,
+    purchase_context,
+    adobe_http_client,
+    adobe_customer_factory,
+    adobe_order_factory,
+    mock_get_adobe_product_by_marketplace_sku,
+    processing_template_url_factory,
+    processing_template_response_factory,
+    screening_template,
+    purchase_template,
+):
+    processing_template_response_factory(TEMPLATE_NAME_PURCHASE, [purchase_template])
+    processing_template_response_factory(TEMPLATE_NAME_SCREENING, [screening_template])
+    adobe_orders_url = urljoin(
+        settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/customers/a-client-id/orders"
+    )
+    requests_mocker.post(
+        adobe_orders_url,
+        status=200,
+        json=adobe_order_factory(order_type=ORDER_TYPE_PREVIEW),
+    )
+    requests_mocker.post(
+        adobe_orders_url,
+        status=202,
+        json=adobe_order_factory(order_type=ORDER_TYPE_NEW, status=AdobeOrderStatus.OPEN.value),
+    )
+    order_url = f"https://localhost/public/v1/commerce/orders/{purchase_context.order_id}"
+    mocked_update_order = requests_mocker.put(order_url, json={})
+    purchase_context.order["template"] = screening_template
+    purchase_context.adobe_customer_id = "a-client-id"
+    purchase_context.adobe_customer = {
+        **adobe_customer_factory(),
+        "status": AdobeCustomerStatus.ACTIVE.value,
+    }
+    pipeline = Pipeline(
+        StartOrderProcessing(TEMPLATE_NAME_PURCHASE, template_to_keep=TEMPLATE_NAME_SCREENING),
+        CreateCustomer(),
+        CheckAccountStatus(),
+        GetPreviewOrder(),
+        SubmitNewOrder(),
+    )
+
+    pipeline.run(mpt_client, purchase_context)  # act
+
+    assert purchase_context.order["template"] == purchase_template
+    assert [(call.request.method, call.request.url) for call in requests_mocker.calls] == [
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_PURCHASE)),
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_SCREENING)),
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_SCREENING)),
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_PURCHASE)),
+        ("PUT", order_url),
+        ("POST", f"{adobe_orders_url}?fetch-price=true"),
+        ("POST", adobe_orders_url),
+        ("PUT", order_url),
+    ]
+    assert json.loads(mocked_update_order.calls[0].request.body) == {"template": purchase_template}
 
 
 def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):

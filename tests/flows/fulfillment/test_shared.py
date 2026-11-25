@@ -296,6 +296,27 @@ def test_start_order_processing_step(mocker, mock_order):
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+def test_start_order_processing_step_no_processing_template(
+    caplog, requests_mocker, mpt_client, mock_next_step, order_factory
+):
+    order = order_factory()
+    requests_mocker.get(
+        "https://localhost/public/v1/catalog/products/PRD-1111-1111/templates"
+        "?and(eq(type,'OrderProcessing'),or(eq(default,'true'),eq(name,'my template')))"
+        "&order=default&limit=1",
+        json={"data": []},
+    )
+    context = Context(order=order, order_id=order["id"])
+    step = StartOrderProcessing("my template")
+
+    step(mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_called_once_with(mpt_client, context)
+    assert context.order == order
+    assert len(requests_mocker.calls) == 1
+    assert "Template my template not found for product PRD-1111-1111" in caplog.text
+
+
 @pytest.mark.parametrize(
     ("auto_renew", "expected_template"),
     [

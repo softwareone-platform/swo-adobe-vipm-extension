@@ -26,6 +26,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
     update_subscription,
 )
 from mpt_extension_sdk.mpt_http.wrap_http_error import MPTError as SDKMPTError
+from requests.exceptions import RequestException
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
@@ -120,6 +121,8 @@ from adobe_vipm.notifications import mpt_notify, send_exception, send_warning
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)
+
+MPT_REQUEST_ERRORS = (SDKMPTError, RequestException)
 
 
 def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
@@ -945,6 +948,76 @@ class SetOrUpdateCotermDate(Step):
         logger.info("%s: Updated parameters: %s", context, params_str)
 
 
+def get_processing_template(client, context: Context, template_name: str) -> dict | None:
+    """
+    Get the processing template with the given name, or the default processing template.
+
+    Args:
+        client: MPT API client.
+        context: Step context.
+        template_name: Name of the template to look up.
+
+    Returns:
+        The named template, the product's default processing template when the named
+        one does not exist, or None when the product has no processing template.
+    """
+    return get_product_template_or_default(
+        client,
+        context.order["agreement"]["product"]["id"],
+        MPT_ORDER_STATUS_PROCESSING,
+        template_name,
+    )
+
+
+def get_named_processing_template(client, context: Context, template_name: str) -> dict | None:
+    """
+    Get the processing template with the given name, without the default fallback.
+
+    Args:
+        client: MPT API client.
+        context: Step context.
+        template_name: Name of the template to look up.
+
+    Returns:
+        The named template, or None when the product has no template with that name.
+    """
+    template = get_processing_template(client, context, template_name)
+    if template and template.get("name") == template_name:
+        return template
+    return None
+
+
+def get_order_template_id(order: dict) -> str | None:
+    """
+    Get the id of the template the order is on.
+
+    Args:
+        order: MPT order.
+
+    Returns:
+        The template id, or None when the order has no template.
+    """
+    return (order.get("template") or {}).get("id")
+
+
+def apply_processing_template(client, context: Context, template: dict) -> None:
+    """
+    Set the template on the order unless the order is already on it.
+
+    Args:
+        client: MPT API client.
+        context: Step context.
+        template: Template to set.
+    """
+    if template["id"] == get_order_template_id(context.order):
+        return
+    update_order(client, context.order_id, template=template)
+    context.order = set_template(context.order, template)
+    logger.info(
+        "%s: processing template set to %s (%s)", context, template.get("name"), template["id"]
+    )
+
+
 class StartOrderProcessing(Step):
     """
     Set the template for the processing status.
@@ -958,42 +1031,30 @@ class StartOrderProcessing(Step):
 
     def __call__(self, client, context, next_step):
         """Set the template for the processing status."""
-        product_id = context.order["agreement"]["product"]["id"]
-        template = get_product_template_or_default(
-            client, product_id, MPT_ORDER_STATUS_PROCESSING, self.template_name
-        )
+        template = get_processing_template(client, context, self.template_name)
         if not template:
             logger.warning(
-                "%s: Template %s not found for product %s", context, self.template_name, product_id
-            )
-
-        current_template_id = (context.order.get("template") or {}).get("id")
-        needs_update = bool(template) and template["id"] != current_template_id
-        if needs_update and self._is_on_template_to_keep(client, product_id, current_template_id):
-            logger.info("%s: processing template %s is kept", context, self.template_to_keep)
-        elif needs_update:
-            context.order = set_template(context.order, template)
-            update_order(client, context.order_id, template=context.order["template"])
-            logger.info(
-                "%s: processing template set to %s (%s)",
+                "%s: Template %s not found for product %s",
                 context,
                 self.template_name,
-                template["id"],
+                context.order["agreement"]["product"]["id"],
             )
+        elif self._keeps_current_template(client, context, template):
+            logger.info("%s: processing template %s is kept", context, self.template_to_keep)
+        else:
+            apply_processing_template(client, context, template)
 
         next_step(client, context)
 
-    def _is_on_template_to_keep(self, client, product_id: str, current_template_id: str) -> bool:
+    def _keeps_current_template(self, client, context, template: dict) -> bool:
+        current_template_id = get_order_template_id(context.order)
         if not self.template_to_keep or not current_template_id:
             return False
-
-        template_to_keep = get_product_template_or_default(
-            client, product_id, MPT_ORDER_STATUS_PROCESSING, self.template_to_keep
-        )
-        if not template_to_keep or template_to_keep.get("name") != self.template_to_keep:
+        if template["id"] == current_template_id:
             return False
 
-        return template_to_keep["id"] == current_template_id
+        template_to_keep = get_named_processing_template(client, context, self.template_to_keep)
+        return bool(template_to_keep) and template_to_keep["id"] == current_template_id
 
 
 class ValidateRenewalWindow(Step):
