@@ -1,3 +1,4 @@
+import logging
 from urllib.parse import urljoin
 
 import pytest
@@ -61,6 +62,7 @@ from adobe_vipm.flows.utils import (
     get_fulfillment_parameter,
     get_ordering_parameter,
 )
+from adobe_vipm.notifications import FactsSection
 
 
 @pytest.fixture
@@ -636,6 +638,96 @@ def test_check_account_status_step_pending(
     assert context.order == mock_order
     assert mock_mpt_client.mock_calls == []
     assert mock_adobe_client.mock_calls == []
+
+
+@pytest.fixture
+def mock_mark_order_as_failed(mocker):
+    return mocker.patch("adobe_vipm.flows.fulfillment.purchase.mark_order_as_failed", autospec=True)
+
+
+@pytest.fixture
+def mock_purchase_send_error(mocker):
+    return mocker.patch("adobe_vipm.flows.fulfillment.purchase.send_error", autospec=True)
+
+
+@pytest.fixture
+def compliance_block_context(mock_order, adobe_customer_factory):
+    return Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+        agreement_id=mock_order["agreement"]["id"],
+        adobe_customer_id="a-client-id",
+        adobe_customer={
+            **adobe_customer_factory(),
+            "status": AdobeCustomerStatus.COMPLIANCE_BLOCK.value,
+        },
+    )
+
+
+def test_check_account_status_step_compliance_block(
+    caplog,
+    mock_mpt_client,
+    mock_next_step,
+    mock_order,
+    mock_mark_order_as_failed,
+    mock_purchase_send_error,
+    compliance_block_context,
+):
+    caplog.set_level(logging.ERROR, logger="adobe_vipm.flows.fulfillment.purchase")
+    step = CheckAccountStatus()
+
+    step(mock_mpt_client, compliance_block_context, mock_next_step)  # act
+
+    mock_next_step.assert_not_called()
+    mock_mark_order_as_failed.assert_called_once_with(
+        mock_mpt_client,
+        mock_order,
+        {
+            "id": "VIPM0060",
+            "message": (
+                "Account creation failed during screening as part of Adobe's ongoing trade "
+                "compliance program. Please contact your SoftwareOne representative."
+            ),
+        },
+    )
+    assert caplog.messages == [
+        (
+            f"{compliance_block_context}: Adobe customer a-client-id is in compliance block, "
+            f"order {mock_order['id']} of agreement {mock_order['agreement']['id']} failed"
+        ),
+    ]
+    mock_purchase_send_error.assert_called_once_with(
+        "Adobe account compliance block",
+        f"The order **{mock_order['id']}** has been failed because Adobe blocked the new "
+        "customer account **a-client-id** during its trade compliance screening.",
+        facts=FactsSection(
+            "Blocked account",
+            {
+                "Order": mock_order["id"],
+                "Agreement": mock_order["agreement"]["id"],
+                "Adobe customer": "a-client-id",
+            },
+        ),
+    )
+
+
+def test_check_account_status_step_compliance_block_fail_order_error(
+    caplog,
+    mock_mpt_client,
+    mock_next_step,
+    mock_mark_order_as_failed,
+    mock_purchase_send_error,
+    compliance_block_context,
+):
+    caplog.set_level(logging.ERROR, logger="adobe_vipm.flows.fulfillment.purchase")
+    mock_mark_order_as_failed.side_effect = RuntimeError("update failed")
+    step = CheckAccountStatus()
+
+    with pytest.raises(RuntimeError, match="update failed"):
+        step(mock_mpt_client, compliance_block_context, mock_next_step)
+
+    mock_purchase_send_error.assert_not_called()
+    assert caplog.messages == []
 
 
 def test_purchase_pipeline_first_run_account_pending(

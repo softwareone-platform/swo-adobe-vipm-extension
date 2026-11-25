@@ -18,6 +18,7 @@ from adobe_vipm.flows.constants import (
     ERR_3YC_NO_MINIMUMS,
     ERR_3YC_QUANTITY_CONSUMABLES,
     ERR_3YC_QUANTITY_LICENSES,
+    ERR_ADOBE_ACCOUNT_COMPLIANCE_BLOCK,
     ERR_ADOBE_ADDRESS,
     ERR_ADOBE_AGENCY_TYPE,
     ERR_ADOBE_COMPANY_NAME,
@@ -47,6 +48,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SyncAgreement,
     UpdateAgreementParamsVisibility,
     ValidateDuplicateLines,
+    mark_order_as_failed,
     switch_order_to_failed,
     switch_order_to_query,
 )
@@ -66,6 +68,7 @@ from adobe_vipm.flows.utils import (
 )
 from adobe_vipm.flows.utils.flex_discounts import get_order_redeemed_codes
 from adobe_vipm.flows.utils.market_segment import is_large_government_agency_type
+from adobe_vipm.notifications import FactsSection, send_error
 
 logger = logging.getLogger(__name__)
 
@@ -304,29 +307,57 @@ class CreateCustomer(Step):
 
 class CheckAccountStatus(Step):
     """
-    Hold the order while the Adobe customer account is pending.
+    Act on the status of the Adobe customer account before any order is sent to Adobe.
 
     No order is sent to Adobe for a pending account: the run stops and the account status is
-    evaluated again on the next run.
+    evaluated again on the next run. A compliance block fails the order and alerts operations.
     """
 
     def __call__(self, client: MPTClient, context: Context, next_step: NextStep) -> None:
         """
-        Continue with the next step unless the Adobe customer account is pending.
+        Continue with the next step unless the Adobe customer account is pending or blocked.
 
         Args:
             client: MPT API client.
             context: Step context.
             next_step: Next pipeline step.
         """
-        if context.adobe_customer.get("status") == AdobeCustomerStatus.PENDING:
+        status = context.adobe_customer.get("status")
+        if status == AdobeCustomerStatus.PENDING:
             logger.info(
                 "%s: Adobe customer %s is pending, waiting for the account to be active",
                 context,
                 context.adobe_customer_id,
             )
             return
+        if status == AdobeCustomerStatus.COMPLIANCE_BLOCK:
+            self._fail_blocked_account(client, context)
+            return
         next_step(client, context)
+
+    def _fail_blocked_account(self, client: MPTClient, context: Context) -> None:
+        mark_order_as_failed(client, context.order, ERR_ADOBE_ACCOUNT_COMPLIANCE_BLOCK.to_dict())
+        logger.error(
+            "%s: Adobe customer %s is in compliance block, order %s of agreement %s failed",
+            context,
+            context.adobe_customer_id,
+            context.order_id,
+            context.agreement_id,
+        )
+        send_error(
+            "Adobe account compliance block",
+            f"The order **{context.order_id}** has been failed because Adobe blocked the new "
+            f"customer account **{context.adobe_customer_id}** during its trade compliance "
+            "screening.",
+            facts=FactsSection(
+                "Blocked account",
+                {
+                    "Order": context.order_id,
+                    "Agreement": context.agreement_id,
+                    "Adobe customer": context.adobe_customer_id,
+                },
+            ),
+        )
 
 
 def fulfill_purchase_order(client, order):

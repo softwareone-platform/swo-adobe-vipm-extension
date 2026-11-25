@@ -513,6 +513,12 @@ ERR_RETURN_VIOLATES_3YC = ValidationError(
     "minimum commit quantity: {error}.",
 )
 
+ERR_ADOBE_ACCOUNT_COMPLIANCE_BLOCK = ValidationError(
+    "VIPM0060",
+    "Account creation failed during screening as part of Adobe's ongoing trade compliance "
+    "program. Please contact your SoftwareOne representative.",
+)
+
 ERR_EARLY_RENEWAL_IN_PROGRESS = ValidationError(
     "VIPM0051",
     "An early renewal has already been placed for this agreement, so Change, "
