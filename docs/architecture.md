@@ -87,9 +87,15 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    to Adobe, and the status is evaluated again on the next run; the step does
    not update the order while Pending, so the customer ID saved by
    `CreateCustomer` and the normal due date handling (`SetupDueDate`) still
-   apply; a Compliance Block (`1022`) fails the order with `VIPM0060` and then
-   alerts operations once (error log and Teams card with the order, the
-   agreement and the Adobe customer ID); it uses `mark_order_as_failed` and not
+   apply; while the account is in Screening (`1023`), `RollScreeningDueDate`,
+   which runs before `SetupDueDate`, moves `dueDate` to today +
+   `DUE_DATE_DAYS`, writing the order only when the value changes (at most once
+   a day); because the roll comes before the expiry check, an order in
+   Screening is not failed on the due date, even when the date was reached
+   while the account was still Pending; a Compliance Block (`1022`) fails the
+   order with `VIPM0060` and then alerts operations once (error log and Teams
+   card with the order, the agreement and the Adobe customer ID); it uses
+   `mark_order_as_failed` and not
    `switch_order_to_failed`, because the agreement of a new Purchase order is
    not Active yet, so there is nothing to synchronize and no synchronization
    error can drop the alert or replace the error; while the account is in
