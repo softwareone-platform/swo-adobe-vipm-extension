@@ -33,6 +33,8 @@ from adobe_vipm.flows.constants import (
     TEMPLATE_ASSET_DEFAULT,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
+    TEMPLATE_NAME_PURCHASE,
+    TEMPLATE_NAME_SCREENING,
     Param,
 )
 from adobe_vipm.flows.context import Context
@@ -360,6 +362,94 @@ def test_set_processing_template_step_already_set_not_first_attempt(
         "my template",
     )
     mocked_update_order.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+@pytest.fixture
+def mock_processing_templates(mocker):
+    templates = {
+        TEMPLATE_NAME_PURCHASE: {"id": "TPL-1234", "name": TEMPLATE_NAME_PURCHASE},
+        TEMPLATE_NAME_SCREENING: {"id": "TPL-9999", "name": TEMPLATE_NAME_SCREENING},
+    }
+    return mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        autospec=True,
+        side_effect=lambda client, product_id, status, name: templates[name],
+    )
+
+
+def test_start_order_processing_keeps_template(mocker, order_factory, mock_processing_templates):
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order", autospec=True
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    order = order_factory(template={"id": "TPL-9999"})
+    context = Context(order=order, order_id=order["id"])
+    step = StartOrderProcessing(TEMPLATE_NAME_PURCHASE, template_to_keep=TEMPLATE_NAME_SCREENING)
+
+    step(mocked_client, context, mocked_next_step)  # act
+
+    assert context.order["template"] == {"id": "TPL-9999"}
+    mocked_update_order.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+@pytest.mark.parametrize(
+    ("template_to_keep", "order_template"),
+    [
+        (None, {"id": "TPL-9999", "name": TEMPLATE_NAME_SCREENING}),
+        (TEMPLATE_NAME_SCREENING, {"id": "TPL-0000", "name": "Default"}),
+        (TEMPLATE_NAME_SCREENING, None),
+    ],
+)
+def test_start_order_processing_replaces_template_not_kept(
+    mocker, order_factory, mock_processing_templates, template_to_keep, order_template
+):
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order", autospec=True
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    order = order_factory()
+    order["template"] = order_template
+    context = Context(order=order, order_id=order["id"])
+    step = StartOrderProcessing(TEMPLATE_NAME_PURCHASE, template_to_keep=template_to_keep)
+
+    step(mocked_client, context, mocked_next_step)  # act
+
+    assert context.order["template"] == {"id": "TPL-1234", "name": TEMPLATE_NAME_PURCHASE}
+    mocked_update_order.assert_called_once_with(
+        mocked_client, context.order_id, template=context.order["template"]
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_start_order_processing_replaces_default_template_when_template_to_keep_missing(
+    mocker, order_factory
+):
+    default_template = {"id": "TPL-0000", "name": "Default"}
+    purchase_template = {"id": "TPL-1234", "name": TEMPLATE_NAME_PURCHASE}
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        autospec=True,
+        side_effect=[purchase_template, default_template],
+    )
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order", autospec=True
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    order = order_factory(template=default_template)
+    context = Context(order=order, order_id=order["id"])
+    step = StartOrderProcessing(TEMPLATE_NAME_PURCHASE, template_to_keep=TEMPLATE_NAME_SCREENING)
+
+    step(mocked_client, context, mocked_next_step)  # act
+
+    assert context.order["template"] == purchase_template
+    mocked_update_order.assert_called_once_with(
+        mocked_client, context.order_id, template=purchase_template
+    )
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
