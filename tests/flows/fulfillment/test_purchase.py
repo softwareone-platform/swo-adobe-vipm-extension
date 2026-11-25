@@ -1,6 +1,14 @@
+from urllib.parse import urljoin
+
 import pytest
 
-from adobe_vipm.adobe.constants import AdobeErrorCode
+from adobe_vipm.adobe.constants import (
+    ORDER_TYPE_NEW,
+    ORDER_TYPE_PREVIEW,
+    AdobeCustomerStatus,
+    AdobeErrorCode,
+    AdobeOrderStatus,
+)
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     ERR_3YC_NO_MINIMUMS,
@@ -17,6 +25,7 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.purchase import (
+    CheckAccountStatus,
     CreateCustomer,
     RefreshCustomer,
     ValidateEducationSubSegments,
@@ -46,11 +55,39 @@ from adobe_vipm.flows.helpers import (
     UpdatePrices,
     Validate3YCCommitment,
 )
+from adobe_vipm.flows.pipeline import Pipeline
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_fulfillment_parameter,
     get_ordering_parameter,
 )
+
+
+@pytest.fixture
+def adobe_http_client(mocker, adobe_client_factory):
+    adobe_client, _, _ = adobe_client_factory()
+    for module in ("purchase", "shared"):
+        mocker.patch(
+            f"adobe_vipm.flows.fulfillment.{module}.get_adobe_client",
+            autospec=True,
+            return_value=adobe_client,
+        )
+    return adobe_client
+
+
+@pytest.fixture
+def purchase_context(mock_order, adobe_authorizations_file):
+    authorization = adobe_authorizations_file["authorizations"][0]
+    return Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+        product_id="PRD-1111-1111",
+        agreement_id=mock_order["agreement"]["id"],
+        authorization_id=authorization["authorization_uk"],
+        seller_id=authorization["resellers"][0]["seller_id"],
+        market_segment="COM",
+        new_lines=mock_order["lines"],
+    )
 
 
 def test_refresh_customer_step(mocker, mock_adobe_client, mock_order):
@@ -555,6 +592,160 @@ def test_create_customer_step_handle_error_invalid_fields(
     mocked_switch_to_query.assert_called_once_with(mock_mpt_client, context.order)
 
 
+@pytest.mark.parametrize(
+    "status",
+    [AdobeCustomerStatus.ACTIVE, AdobeCustomerStatus.INACTIVE],
+)
+def test_check_account_status_step_continues(
+    status, mock_adobe_client, mock_mpt_client, mock_next_step, mock_order, adobe_customer_factory
+):
+    context = Context(
+        order=mock_order,
+        adobe_customer_id="a-client-id",
+        adobe_customer={**adobe_customer_factory(), "status": status.value},
+    )
+    step = CheckAccountStatus()
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+    assert mock_mpt_client.mock_calls == []
+    assert mock_adobe_client.mock_calls == []
+
+
+def test_check_account_status_step_pending(
+    mocker, mock_adobe_client, mock_mpt_client, mock_next_step, mock_order, adobe_customer_factory
+):
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.update_order", autospec=True
+    )
+    context = Context(
+        order=mock_order,
+        adobe_customer_id="a-client-id",
+        adobe_customer={
+            **adobe_customer_factory(),
+            "status": AdobeCustomerStatus.PENDING.value,
+        },
+    )
+    step = CheckAccountStatus()
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_not_called()
+    mocked_update_order.assert_not_called()
+    assert context.order == mock_order
+    assert mock_mpt_client.mock_calls == []
+    assert mock_adobe_client.mock_calls == []
+
+
+def test_purchase_pipeline_first_run_account_pending(
+    requests_mocker,
+    settings,
+    mpt_client,
+    purchase_context,
+    adobe_http_client,
+    adobe_customer_factory,
+):
+    adobe_api_url = settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"]
+    requests_mocker.post(
+        urljoin(adobe_api_url, "/v3/customers"),
+        status=201,
+        json={**adobe_customer_factory(), "status": AdobeCustomerStatus.PENDING.value},
+    )
+    requests_mocker.put(
+        f"https://localhost/public/v1/commerce/orders/{purchase_context.order_id}", json={}
+    )
+    requests_mocker.put(
+        f"https://localhost/public/v1/commerce/agreements/{purchase_context.agreement_id}",
+        json={},
+    )
+    pipeline = Pipeline(
+        CreateCustomer(),
+        CheckAccountStatus(),
+        GetPreviewOrder(),
+        SubmitNewOrder(),
+    )
+
+    pipeline.run(mpt_client, purchase_context)  # act
+
+    assert get_adobe_customer_id(purchase_context.order) == "a-client-id"
+    assert [(call.request.method, call.request.url) for call in requests_mocker.calls] == [
+        ("POST", urljoin(adobe_api_url, "/v3/customers")),
+        ("PUT", f"https://localhost/public/v1/commerce/orders/{purchase_context.order_id}"),
+        (
+            "PUT",
+            f"https://localhost/public/v1/commerce/agreements/{purchase_context.agreement_id}",
+        ),
+    ]
+
+
+def test_purchase_pipeline_later_run_account_pending(
+    requests_mocker, mpt_client, purchase_context, adobe_http_client, adobe_customer_factory
+):
+    purchase_context.adobe_customer_id = "a-client-id"
+    purchase_context.adobe_customer = {
+        **adobe_customer_factory(),
+        "status": AdobeCustomerStatus.PENDING.value,
+    }
+    pipeline = Pipeline(
+        CreateCustomer(),
+        CheckAccountStatus(),
+        GetPreviewOrder(),
+        SubmitNewOrder(),
+    )
+
+    pipeline.run(mpt_client, purchase_context)  # act
+
+    assert len(requests_mocker.calls) == 0
+
+
+def test_purchase_pipeline_later_run_account_active(
+    requests_mocker,
+    settings,
+    mpt_client,
+    purchase_context,
+    adobe_http_client,
+    adobe_customer_factory,
+    adobe_order_factory,
+    mock_get_adobe_product_by_marketplace_sku,
+):
+    adobe_orders_url = urljoin(
+        settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/customers/a-client-id/orders"
+    )
+    requests_mocker.post(
+        adobe_orders_url,
+        status=200,
+        json=adobe_order_factory(order_type=ORDER_TYPE_PREVIEW),
+    )
+    requests_mocker.post(
+        adobe_orders_url,
+        status=202,
+        json=adobe_order_factory(order_type=ORDER_TYPE_NEW, status=AdobeOrderStatus.OPEN.value),
+    )
+    requests_mocker.put(
+        f"https://localhost/public/v1/commerce/orders/{purchase_context.order_id}", json={}
+    )
+    purchase_context.adobe_customer_id = "a-client-id"
+    purchase_context.adobe_customer = {
+        **adobe_customer_factory(),
+        "status": AdobeCustomerStatus.ACTIVE.value,
+    }
+    pipeline = Pipeline(
+        CreateCustomer(),
+        CheckAccountStatus(),
+        GetPreviewOrder(),
+        SubmitNewOrder(),
+    )
+
+    pipeline.run(mpt_client, purchase_context)  # act
+
+    assert [(call.request.method, call.request.url) for call in requests_mocker.calls] == [
+        ("POST", f"{adobe_orders_url}?fetch-price=true"),
+        ("POST", adobe_orders_url),
+        ("PUT", f"https://localhost/public/v1/commerce/orders/{purchase_context.order_id}"),
+    ]
+
+
 def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
     mocked_pipeline_instance = mocker.MagicMock()
     mocked_pipeline_ctor = mocker.patch(
@@ -577,6 +768,7 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
         ValidateGovernmentLGA,
         PrepareCustomerData,
         CreateCustomer,
+        CheckAccountStatus,
         ValidateEducationSubSegments,
         Validate3YCCommitment,
         SelectFlexDiscounts,
@@ -596,6 +788,6 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
     assert mocked_pipeline_ctor.mock_calls[0].args[2].template_name == TEMPLATE_NAME_PURCHASE
-    assert mocked_pipeline_ctor.mock_calls[0].args[19].template_name == TEMPLATE_NAME_PURCHASE
+    assert mocked_pipeline_ctor.mock_calls[0].args[20].template_name == TEMPLATE_NAME_PURCHASE
     mocked_context_ctor.assert_called_once_with(order=mock_order)
     mocked_pipeline_instance.run.assert_called_once_with(mock_mpt_client, mocked_context)

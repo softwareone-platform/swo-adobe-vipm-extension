@@ -80,7 +80,14 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    changes first (`ReverseRenewalChangesOnError`), so a retry starts from the
    customer's own state; only the confirmed codes are recorded as redeemed; `renewal.py` also hosts the 3YC
    committed-minimum floor guard (`Validate3YCRenewalFloor`)
-   that both renewal flows run before mutating Adobe; `shared.py` holds common
+   that both renewal flows run before mutating Adobe; `purchase.py` reads the
+   status of the Adobe customer account right after it is created or re-read
+   (`CheckAccountStatus`, statuses in `AdobeCustomerStatus`): while the account
+   is Pending (`1002`) the run stops before any preview or `NEW` order is sent
+   to Adobe, and the status is evaluated again on the next run; the step itself
+   does not update the order, so the customer ID saved by `CreateCustomer` and
+   the normal due date handling (`SetupDueDate`) still apply; any other status
+   continues; `shared.py` holds common
    utilities, the `SelectFlexDiscounts` step that reads the Airtable discount
    store and ranks the candidate codes of new/upsize lines (selection rules in
    `flows/utils/flex_discounts.py`; the Adobe client then cascades through the

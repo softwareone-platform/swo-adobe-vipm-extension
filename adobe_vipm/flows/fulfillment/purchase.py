@@ -7,10 +7,11 @@ processing.
 
 import logging
 
+from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import update_agreement, update_order
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import AdobeErrorCode
+from adobe_vipm.adobe.constants import AdobeCustomerStatus, AdobeErrorCode
 from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.flows.constants import (
@@ -55,7 +56,7 @@ from adobe_vipm.flows.helpers import (
     UpdatePrices,
     Validate3YCCommitment,
 )
-from adobe_vipm.flows.pipeline import Pipeline, Step
+from adobe_vipm.flows.pipeline import NextStep, Pipeline, Step
 from adobe_vipm.flows.utils import (
     get_ordering_parameter,
     set_adobe_3yc_commitment_request_status,
@@ -301,6 +302,33 @@ class CreateCustomer(Step):
             self.handle_error(client, context, error)
 
 
+class CheckAccountStatus(Step):
+    """
+    Hold the order while the Adobe customer account is pending.
+
+    No order is sent to Adobe for a pending account: the run stops and the account status is
+    evaluated again on the next run.
+    """
+
+    def __call__(self, client: MPTClient, context: Context, next_step: NextStep) -> None:
+        """
+        Continue with the next step unless the Adobe customer account is pending.
+
+        Args:
+            client: MPT API client.
+            context: Step context.
+            next_step: Next pipeline step.
+        """
+        if context.adobe_customer.get("status") == AdobeCustomerStatus.PENDING:
+            logger.info(
+                "%s: Adobe customer %s is pending, waiting for the account to be active",
+                context,
+                context.adobe_customer_id,
+            )
+            return
+        next_step(client, context)
+
+
 def fulfill_purchase_order(client, order):
     """
     Purchase order pipeline.
@@ -318,6 +346,7 @@ def fulfill_purchase_order(client, order):
         ValidateGovernmentLGA(),
         PrepareCustomerData(is_validation=False),
         CreateCustomer(),
+        CheckAccountStatus(),
         ValidateEducationSubSegments(),
         Validate3YCCommitment(),
         SelectFlexDiscounts(),
