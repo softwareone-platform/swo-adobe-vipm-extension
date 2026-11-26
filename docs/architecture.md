@@ -86,8 +86,14 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    is Pending (`1002`) the run stops before any preview or `NEW` order is sent
    to Adobe, and the status is evaluated again on the next run; the step itself
    does not update the order, so the customer ID saved by `CreateCustomer` and
-   the normal due date handling (`SetupDueDate`) still apply; any other status
-   continues; `shared.py` holds common
+   the normal due date handling (`SetupDueDate`) still apply; a Compliance
+   Block (`1022`) fails the order with `VIPM0060` and then alerts operations
+   once (error log and Teams card with the order, the agreement and the Adobe
+   customer ID); it uses `mark_order_as_failed` and not
+   `switch_order_to_failed`, because the agreement of a new Purchase order is
+   not Active yet, so there is nothing to synchronize and no synchronization
+   error can drop the alert or replace the error; any other
+   status continues; `shared.py` holds common
    utilities, the `SelectFlexDiscounts` step that reads the Airtable discount
    store and ranks the candidate codes of new/upsize lines (selection rules in
    `flows/utils/flex_discounts.py`; the Adobe client then cascades through the

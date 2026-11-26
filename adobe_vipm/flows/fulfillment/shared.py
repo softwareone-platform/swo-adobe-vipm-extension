@@ -6,6 +6,7 @@ import logging
 from collections import Counter
 
 from django.conf import settings
+from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
     complete_order,
     create_order_asset,
@@ -204,17 +205,19 @@ def save_adobe_order_id(client, order, order_id):
     return order
 
 
-def switch_order_to_failed(mpt_client, order, error):
+def mark_order_as_failed(mpt_client: MPTClient, order: dict, error: dict) -> dict:
     """
     Marks an MPT order as failed by resetting due date and updating its status.
 
+    The agreement is not synchronized, see `switch_order_to_failed`.
+
     Args:
-        mpt_client (MPTClient): An instance of the Marketplace platform client.
-        order (dict): The MPT order to be marked as failed.
-        error (dict): Additional notes or context related to the failure.
+        mpt_client: An instance of the Marketplace platform client.
+        order: The MPT order to be marked as failed.
+        error: Additional notes or context related to the failure.
 
     Returns:
-        dict: The updated order with the appropriate status and notes.
+        The updated order with the appropriate status and notes.
     """
     order = reset_due_date(order)
     agreement = order["agreement"]
@@ -225,9 +228,26 @@ def switch_order_to_failed(mpt_client, order, error):
         parameters=order["parameters"],
     )
     order["agreement"] = agreement
+    return order
+
+
+def switch_order_to_failed(mpt_client: MPTClient, order: dict, error: dict) -> dict:
+    """
+    Marks an MPT order as failed and synchronizes its agreement.
+
+    Args:
+        mpt_client: An instance of the Marketplace platform client.
+        order: The MPT order to be marked as failed.
+        error: Additional notes or context related to the failure.
+
+    Returns:
+        The updated order with the appropriate status and notes.
+    """
+    agreement_id = order["agreement"]["id"]
+    order = mark_order_as_failed(mpt_client, order, error)
     adobe_client = get_adobe_client()
     sync_agreements_by_agreement_ids(
-        mpt_client, adobe_client, [agreement["id"]], dry_run=False, sync_prices=False
+        mpt_client, adobe_client, [agreement_id], dry_run=False, sync_prices=False
     )
     return order
 
