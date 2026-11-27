@@ -28,6 +28,7 @@ from adobe_vipm.flows.constants import (
     MARKET_SEGMENTS,
     TEMPLATE_EDUCATION_QUERY_SUBSEGMENT,
     TEMPLATE_NAME_PURCHASE,
+    TEMPLATE_NAME_SCREENING,
     VALID_GOVERNMENT_AGENCY_TYPES,
     Param,
 )
@@ -371,7 +372,7 @@ def fulfill_purchase_order(client, order):
     pipeline = Pipeline(
         SetupContext(),
         DiscardCarriedOverFlexDiscounts(),
-        StartOrderProcessing(TEMPLATE_NAME_PURCHASE),
+        StartOrderProcessing(TEMPLATE_NAME_PURCHASE, template_to_keep=TEMPLATE_NAME_SCREENING),
         SetupDueDate(),
         ValidateDuplicateLines(),
         ValidateGovernmentLGA(),

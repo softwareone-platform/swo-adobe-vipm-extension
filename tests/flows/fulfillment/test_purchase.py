@@ -22,6 +22,7 @@ from adobe_vipm.flows.constants import (
     MARKET_SEGMENT_COMMERCIAL,
     TEMPLATE_EDUCATION_QUERY_SUBSEGMENT,
     TEMPLATE_NAME_PURCHASE,
+    TEMPLATE_NAME_SCREENING,
     Param,
 )
 from adobe_vipm.flows.context import Context
@@ -880,6 +881,7 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
     assert mocked_pipeline_ctor.mock_calls[0].args[2].template_name == TEMPLATE_NAME_PURCHASE
+    assert mocked_pipeline_ctor.mock_calls[0].args[2].template_to_keep == TEMPLATE_NAME_SCREENING
     assert mocked_pipeline_ctor.mock_calls[0].args[20].template_name == TEMPLATE_NAME_PURCHASE
     mocked_context_ctor.assert_called_once_with(order=mock_order)
     mocked_pipeline_instance.run.assert_called_once_with(mock_mpt_client, mocked_context)

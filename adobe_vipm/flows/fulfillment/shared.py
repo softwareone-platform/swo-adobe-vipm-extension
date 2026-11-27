@@ -949,11 +949,12 @@ class StartOrderProcessing(Step):
     """
     Set the template for the processing status.
 
-    Or the delayed one if the processing is delayed due to the renewal window open.
+    The template is left untouched when the order is on the template to keep.
     """
 
-    def __init__(self, template_name):
+    def __init__(self, template_name: str, template_to_keep: str | None = None):
         self.template_name = template_name
+        self.template_to_keep = template_to_keep
 
     def __call__(self, client, context, next_step):
         """Set the template for the processing status."""
@@ -966,8 +967,11 @@ class StartOrderProcessing(Step):
                 "%s: Template %s not found for product %s", context, self.template_name, product_id
             )
 
-        current_template_id = context.order.get("template", {}).get("id")
-        if template and template["id"] != current_template_id:
+        current_template_id = (context.order.get("template") or {}).get("id")
+        needs_update = bool(template) and template["id"] != current_template_id
+        if needs_update and self._is_on_template_to_keep(client, product_id, current_template_id):
+            logger.info("%s: processing template %s is kept", context, self.template_to_keep)
+        elif needs_update:
             context.order = set_template(context.order, template)
             update_order(client, context.order_id, template=context.order["template"])
             logger.info(
@@ -976,9 +980,20 @@ class StartOrderProcessing(Step):
                 self.template_name,
                 template["id"],
             )
-            logger.info("%s: processing template is ok, continue", context)
 
         next_step(client, context)
+
+    def _is_on_template_to_keep(self, client, product_id: str, current_template_id: str) -> bool:
+        if not self.template_to_keep or not current_template_id:
+            return False
+
+        template_to_keep = get_product_template_or_default(
+            client, product_id, MPT_ORDER_STATUS_PROCESSING, self.template_to_keep
+        )
+        if not template_to_keep or template_to_keep.get("name") != self.template_to_keep:
+            return False
+
+        return template_to_keep["id"] == current_template_id
 
 
 class ValidateRenewalWindow(Step):
