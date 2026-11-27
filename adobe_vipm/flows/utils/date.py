@@ -44,6 +44,19 @@ def set_due_date(order: dict) -> dict:
     return updated_order
 
 
+def roll_due_date(order: dict) -> dict:
+    """
+    Sets DUE_DATE parameter to the value of today() + EXT_DUE_DATE_DAYS, replacing any value.
+
+    Args:
+        order: The order that contains the due date fulfillment parameter.
+
+    Returns:
+        Updated MPT order.
+    """
+    return set_due_date(reset_due_date(copy.deepcopy(order)))
+
+
 def get_due_date(order: dict) -> dt.date | None:
     """
     Gets DUE_DATE parameter.

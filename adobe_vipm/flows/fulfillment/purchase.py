@@ -69,7 +69,9 @@ from adobe_vipm.flows.helpers import (
 )
 from adobe_vipm.flows.pipeline import NextStep, Pipeline, Step
 from adobe_vipm.flows.utils import (
+    get_due_date,
     get_ordering_parameter,
+    roll_due_date,
     set_adobe_3yc_commitment_request_status,
     set_adobe_customer_id,
     set_order_error,
@@ -314,6 +316,36 @@ class CreateCustomer(Step):
             self.handle_error(client, context, error)
 
 
+class RollScreeningDueDate(Step):
+    """
+    Move the due date forward while the Adobe customer account is in screening.
+
+    Screening has no time limit. The step runs before the due date check, so an order that
+    waits on Adobe's screening is not failed for a due date that has been reached.
+    """
+
+    def __call__(self, client: MPTClient, context: Context, next_step: NextStep) -> None:
+        """
+        Set the due date to today + DUE_DATE_DAYS when the account is in screening.
+
+        The order is updated only when the due date changes.
+
+        Args:
+            client: MPT API client.
+            context: Step context.
+            next_step: Next pipeline step.
+        """
+        adobe_customer = context.adobe_customer or {}
+        if adobe_customer.get("status") == AdobeCustomerStatus.SCREENING:
+            rolled_order = roll_due_date(context.order)
+            due_date = get_due_date(rolled_order)
+            if due_date != get_due_date(context.order):
+                update_order(client, context.order_id, parameters=rolled_order["parameters"])
+                context.order = rolled_order
+                logger.info("%s: due date is rolled to %s", context, due_date.strftime("%Y-%m-%d"))
+        next_step(client, context)
+
+
 class CheckAccountStatus(Step):
     """
     Act on the status of the Adobe customer account before any order is sent to Adobe.
@@ -443,6 +475,7 @@ def fulfill_purchase_order(client, order):
         SetupContext(),
         DiscardCarriedOverFlexDiscounts(),
         StartOrderProcessing(TEMPLATE_NAME_PURCHASE, template_to_keep=TEMPLATE_NAME_SCREENING),
+        RollScreeningDueDate(),
         SetupDueDate(),
         ValidateDuplicateLines(),
         ValidateGovernmentLGA(),

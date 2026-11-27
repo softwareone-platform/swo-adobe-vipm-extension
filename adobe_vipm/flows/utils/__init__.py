@@ -14,6 +14,7 @@ from .date import (
     get_due_date,
     is_coterm_date_within_order_creation_window,
     reset_due_date,
+    roll_due_date,
     set_due_date,
 )
 from .deployment import (

@@ -1,9 +1,11 @@
+import datetime as dt
 import json
 import logging
 from urllib.parse import urljoin
 
 import pytest
 import requests
+from freezegun import freeze_time
 
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
@@ -20,6 +22,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_ADDRESS,
     ERR_ADOBE_COMPANY_NAME,
     ERR_ADOBE_CONTACT,
+    ERR_DUE_DATE_REACHED,
     ERR_VIPM_UNHANDLED_EXCEPTION,
     MARKET_SEGMENT_COMMERCIAL,
     TEMPLATE_EDUCATION_QUERY_SUBSEGMENT,
@@ -32,6 +35,7 @@ from adobe_vipm.flows.fulfillment.purchase import (
     CheckAccountStatus,
     CreateCustomer,
     RefreshCustomer,
+    RollScreeningDueDate,
     ValidateEducationSubSegments,
     ValidateGovernmentLGA,
     fulfill_purchase_order,
@@ -62,6 +66,7 @@ from adobe_vipm.flows.helpers import (
 from adobe_vipm.flows.pipeline import Pipeline
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
+    get_due_date,
     get_fulfillment_parameter,
     get_ordering_parameter,
 )
@@ -1148,6 +1153,107 @@ def test_check_account_status_step_compliance_block_fail_order_error(
     assert caplog.messages == []
 
 
+@freeze_time("2025-01-05")
+@pytest.mark.parametrize("due_date", [None, "2025-01-04", "2025-01-10", "2025-02-03"])
+def test_roll_screening_due_date_step(
+    due_date,
+    requests_mocker,
+    mpt_client,
+    mock_adobe_client,
+    mock_next_step,
+    order_factory,
+    fulfillment_parameters_factory,
+    adobe_customer_factory,
+):
+    order = order_factory(fulfillment_parameters=fulfillment_parameters_factory(due_date=due_date))
+    order_url = f"https://localhost/public/v1/commerce/orders/{order['id']}"
+    requests_mocker.put(order_url, json={})
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id="a-client-id",
+        adobe_customer={
+            **adobe_customer_factory(),
+            "status": AdobeCustomerStatus.SCREENING.value,
+        },
+    )
+    step = RollScreeningDueDate()
+
+    step(mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_called_once_with(mpt_client, context)
+    assert get_due_date(context.order) == dt.date(2025, 2, 4)
+    assert [(call.request.method, call.request.url) for call in requests_mocker.calls] == [
+        ("PUT", order_url),
+    ]
+    sent_due_date = get_fulfillment_parameter(
+        json.loads(requests_mocker.calls[0].request.body), Param.DUE_DATE.value
+    )
+    assert sent_due_date["value"] == "2025-02-04"
+    assert mock_adobe_client.mock_calls == []
+
+
+@freeze_time("2025-01-05")
+def test_roll_screening_due_date_step_already_rolled(
+    requests_mocker,
+    mpt_client,
+    mock_next_step,
+    order_factory,
+    fulfillment_parameters_factory,
+    adobe_customer_factory,
+):
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(due_date="2025-02-04")
+    )
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id="a-client-id",
+        adobe_customer={
+            **adobe_customer_factory(),
+            "status": AdobeCustomerStatus.SCREENING.value,
+        },
+    )
+    step = RollScreeningDueDate()
+
+    step(mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_called_once_with(mpt_client, context)
+    assert context.order == order
+    assert len(requests_mocker.calls) == 0
+
+
+@freeze_time("2025-01-05")
+@pytest.mark.parametrize(
+    "adobe_customer",
+    [
+        None,
+        {"status": AdobeCustomerStatus.PENDING.value},
+        {"status": AdobeCustomerStatus.ACTIVE.value},
+        {"status": AdobeCustomerStatus.COMPLIANCE_BLOCK.value},
+    ],
+)
+def test_roll_screening_due_date_step_not_in_screening(
+    adobe_customer,
+    requests_mocker,
+    mpt_client,
+    mock_next_step,
+    order_factory,
+    fulfillment_parameters_factory,
+):
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(due_date="2025-01-10")
+    )
+    context = Context(order=order, order_id=order["id"], adobe_customer=adobe_customer)
+    step = RollScreeningDueDate()
+
+    step(mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_called_once_with(mpt_client, context)
+    assert context.order == order
+    assert len(requests_mocker.calls) == 0
+
+
 def test_purchase_pipeline_first_run_account_pending(
     requests_mocker,
     settings,
@@ -1206,6 +1312,93 @@ def test_purchase_pipeline_later_run_account_pending(
 
     pipeline.run(mpt_client, purchase_context)  # act
 
+    assert len(requests_mocker.calls) == 0
+
+
+@freeze_time("2025-01-05")
+@pytest.mark.parametrize("due_date", ["2025-01-04", "2025-02-03"])
+def test_purchase_pipeline_later_run_account_screening_rolls_due_date(
+    due_date,
+    requests_mocker,
+    mpt_client,
+    purchase_context,
+    adobe_http_client,
+    adobe_customer_factory,
+    order_factory,
+    fulfillment_parameters_factory,
+    processing_template_url_factory,
+    processing_template_response_factory,
+    screening_template,
+):
+    processing_template_response_factory(TEMPLATE_NAME_SCREENING, [screening_template])
+    order_url = f"https://localhost/public/v1/commerce/orders/{purchase_context.order_id}"
+    requests_mocker.put(order_url, json={})
+    purchase_context.order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(due_date=due_date)
+    )
+    purchase_context.order["template"] = screening_template
+    purchase_context.adobe_customer_id = "a-client-id"
+    purchase_context.adobe_customer = {
+        **adobe_customer_factory(),
+        "status": AdobeCustomerStatus.SCREENING.value,
+    }
+    pipeline = Pipeline(
+        RollScreeningDueDate(),
+        SetupDueDate(),
+        CreateCustomer(),
+        CheckAccountStatus(),
+        GetPreviewOrder(),
+        SubmitNewOrder(),
+    )
+
+    pipeline.run(mpt_client, purchase_context)  # act
+
+    assert get_due_date(purchase_context.order) == dt.date(2025, 2, 4)
+    assert [(call.request.method, call.request.url) for call in requests_mocker.calls] == [
+        ("PUT", order_url),
+        ("PUT", order_url),
+        ("GET", processing_template_url_factory(TEMPLATE_NAME_SCREENING)),
+    ]
+
+
+@freeze_time("2025-01-05")
+def test_purchase_pipeline_later_run_account_pending_due_date_reached(
+    mocker,
+    requests_mocker,
+    mpt_client,
+    purchase_context,
+    adobe_http_client,
+    adobe_customer_factory,
+    order_factory,
+    fulfillment_parameters_factory,
+):
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed", autospec=True
+    )
+    purchase_context.order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(due_date="2025-01-04")
+    )
+    purchase_context.adobe_customer_id = "a-client-id"
+    purchase_context.adobe_customer = {
+        **adobe_customer_factory(),
+        "status": AdobeCustomerStatus.PENDING.value,
+    }
+    pipeline = Pipeline(
+        RollScreeningDueDate(),
+        SetupDueDate(),
+        CreateCustomer(),
+        CheckAccountStatus(),
+        GetPreviewOrder(),
+        SubmitNewOrder(),
+    )
+
+    pipeline.run(mpt_client, purchase_context)  # act
+
+    mocked_switch_to_failed.assert_called_once_with(
+        mpt_client,
+        purchase_context.order,
+        ERR_DUE_DATE_REACHED.to_dict(due_date="2025-01-04"),
+    )
     assert len(requests_mocker.calls) == 0
 
 
@@ -1426,6 +1619,7 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
         SetupContext,
         DiscardCarriedOverFlexDiscounts,
         StartOrderProcessing,
+        RollScreeningDueDate,
         SetupDueDate,
         ValidateDuplicateLines,
         ValidateGovernmentLGA,
@@ -1452,6 +1646,6 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
     assert actual_steps == expected_steps
     assert mocked_pipeline_ctor.mock_calls[0].args[2].template_name == TEMPLATE_NAME_PURCHASE
     assert mocked_pipeline_ctor.mock_calls[0].args[2].template_to_keep == TEMPLATE_NAME_SCREENING
-    assert mocked_pipeline_ctor.mock_calls[0].args[20].template_name == TEMPLATE_NAME_PURCHASE
+    assert mocked_pipeline_ctor.mock_calls[0].args[21].template_name == TEMPLATE_NAME_PURCHASE
     mocked_context_ctor.assert_called_once_with(order=mock_order)
     mocked_pipeline_instance.run.assert_called_once_with(mock_mpt_client, mocked_context)
