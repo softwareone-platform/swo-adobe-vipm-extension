@@ -84,16 +84,28 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    status of the Adobe customer account right after it is created or re-read
    (`CheckAccountStatus`, statuses in `AdobeCustomerStatus`): while the account
    is Pending (`1002`) the run stops before any preview or `NEW` order is sent
-   to Adobe, and the status is evaluated again on the next run; the step itself
-   does not update the order, so the customer ID saved by `CreateCustomer` and
-   the normal due date handling (`SetupDueDate`) still apply; a Compliance
-   Block (`1022`) fails the order with `VIPM0060` and then alerts operations
-   once (error log and Teams card with the order, the agreement and the Adobe
-   customer ID); it uses `mark_order_as_failed` and not
+   to Adobe, and the status is evaluated again on the next run; the step does
+   not update the order while Pending, so the customer ID saved by
+   `CreateCustomer` and the normal due date handling (`SetupDueDate`) still
+   apply; a Compliance Block (`1022`) fails the order with `VIPM0060` and then
+   alerts operations once (error log and Teams card with the order, the
+   agreement and the Adobe customer ID); it uses `mark_order_as_failed` and not
    `switch_order_to_failed`, because the agreement of a new Purchase order is
    not Active yet, so there is nothing to synchronize and no synchronization
-   error can drop the alert or replace the error; any other
-   status continues; `shared.py` holds common
+   error can drop the alert or replace the error; while the account is in
+   Screening (`1023`) the step sets the `Screening` processing template and
+   stops the run the same way as for Pending; any other status continues,
+   after the `Purchase` template is restored when the order is on the
+   `Screening` template; a template is written only when it differs from the
+   order's current one (compared by id); in Screening, when the product has no
+   template named `Screening`, the step logs a warning and keeps the current
+   template; for other statuses the restore is skipped when the Screening
+   template cannot be identified; a restore falls back to the product's
+   default processing template, with a warning, when the product has no
+   template named `Purchase`; a Marketplace or connection error while the
+   template is set or restored is logged and the order keeps its current
+   template, still waiting in Screening and still continuing otherwise;
+   `shared.py` holds common
    utilities, the `SelectFlexDiscounts` step that reads the Airtable discount
    store and ranks the candidate codes of new/upsize lines (selection rules in
    `flows/utils/flex_discounts.py`; the Adobe client then cascades through the

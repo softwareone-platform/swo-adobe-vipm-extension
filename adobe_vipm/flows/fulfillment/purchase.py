@@ -8,7 +8,10 @@ processing.
 import logging
 
 from mpt_extension_sdk.mpt_http.base import MPTClient
-from mpt_extension_sdk.mpt_http.mpt import update_agreement, update_order
+from mpt_extension_sdk.mpt_http.mpt import (
+    update_agreement,
+    update_order,
+)
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import AdobeCustomerStatus, AdobeErrorCode
@@ -35,6 +38,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.renewal import RecordDiscountRedemptions
 from adobe_vipm.flows.fulfillment.shared import (
+    MPT_REQUEST_ERRORS,
     CompleteOrder,
     CreateOrUpdateAssets,
     CreateOrUpdateSubscriptions,
@@ -49,6 +53,10 @@ from adobe_vipm.flows.fulfillment.shared import (
     SyncAgreement,
     UpdateAgreementParamsVisibility,
     ValidateDuplicateLines,
+    apply_processing_template,
+    get_named_processing_template,
+    get_order_template_id,
+    get_processing_template,
     mark_order_as_failed,
     switch_order_to_failed,
     switch_order_to_query,
@@ -310,13 +318,15 @@ class CheckAccountStatus(Step):
     """
     Act on the status of the Adobe customer account before any order is sent to Adobe.
 
-    No order is sent to Adobe for a pending account: the run stops and the account status is
-    evaluated again on the next run. A compliance block fails the order and alerts operations.
+    No order is sent to Adobe for a pending account or an account in screening: the run stops
+    and the account status is evaluated again on the next run. The order shows the Screening
+    template while the account is in screening and the Purchase template otherwise. A
+    compliance block fails the order and alerts operations.
     """
 
     def __call__(self, client: MPTClient, context: Context, next_step: NextStep) -> None:
         """
-        Continue with the next step unless the Adobe customer account is pending or blocked.
+        Continue with the next step unless the account is pending, in screening or blocked.
 
         Args:
             client: MPT API client.
@@ -334,7 +344,67 @@ class CheckAccountStatus(Step):
         if status == AdobeCustomerStatus.COMPLIANCE_BLOCK:
             self._fail_blocked_account(client, context)
             return
+        if status == AdobeCustomerStatus.SCREENING:
+            try:
+                self._set_screening_template(client, context)
+            except MPT_REQUEST_ERRORS:
+                logger.exception(
+                    "%s: failed to set the %s template, the current template is kept",
+                    context,
+                    TEMPLATE_NAME_SCREENING,
+                )
+            logger.info(
+                "%s: Adobe customer %s is in screening, waiting for the account to be active",
+                context,
+                context.adobe_customer_id,
+            )
+            return
+        try:
+            self._restore_purchase_template(client, context)
+        except MPT_REQUEST_ERRORS:
+            logger.exception(
+                "%s: failed to restore the %s template, the current template is kept",
+                context,
+                TEMPLATE_NAME_PURCHASE,
+            )
         next_step(client, context)
+
+    def _set_screening_template(self, client: MPTClient, context: Context) -> None:
+        screening_template = get_named_processing_template(client, context, TEMPLATE_NAME_SCREENING)
+        if not screening_template:
+            logger.warning(
+                "%s: template %s not found for product %s, the current template is kept",
+                context,
+                TEMPLATE_NAME_SCREENING,
+                context.order["agreement"]["product"]["id"],
+            )
+            return
+        apply_processing_template(client, context, screening_template)
+
+    def _restore_purchase_template(self, client: MPTClient, context: Context) -> None:
+        screening_template = get_named_processing_template(client, context, TEMPLATE_NAME_SCREENING)
+        if not screening_template:
+            return
+        if screening_template["id"] != get_order_template_id(context.order):
+            return
+        purchase_template = get_processing_template(client, context, TEMPLATE_NAME_PURCHASE)
+        product_id = context.order["agreement"]["product"]["id"]
+        if not purchase_template:
+            logger.warning(
+                "%s: no processing template found for product %s, the %s template is kept",
+                context,
+                product_id,
+                TEMPLATE_NAME_SCREENING,
+            )
+            return
+        if purchase_template.get("name") != TEMPLATE_NAME_PURCHASE:
+            logger.warning(
+                "%s: template %s not found for product %s, the default template is used",
+                context,
+                TEMPLATE_NAME_PURCHASE,
+                product_id,
+            )
+        apply_processing_template(client, context, purchase_template)
 
     def _fail_blocked_account(self, client: MPTClient, context: Context) -> None:
         mark_order_as_failed(client, context.order, ERR_ADOBE_ACCOUNT_COMPLIANCE_BLOCK.to_dict())
